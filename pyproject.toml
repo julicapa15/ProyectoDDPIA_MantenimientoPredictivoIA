@@ -1,0 +1,25 @@
+[project]
+name = "mantenimiento-predictivo"
+version = "0.1.0"
+description = "Mantenimiento predictivo con TabPFN-v2 sobre AI4I 2020"
+readme = "README.md"
+authors = [
+    { name = "Juliana Campuzano" },
+    { name = "Diego Fernando Garcés" },
+    { name = "Jorge Iván Gonzáles" },
+    { name = "Juan José Mosquera" },
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "matplotlib>=3.11.1",
+    "numpy>=2.4.6",
+    "pandas>=3.0.5",
+    "pytest>=9.1.1",
+    "scikit-learn>=1.9.0",
+    "streamlit>=1.63.0",
+    "tabpfn>=8.5.0",
+    "xgboost>=3.2.0",
+]
+
+[tool.uv]
+package = false
