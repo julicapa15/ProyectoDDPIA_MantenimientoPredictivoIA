@@ -9,9 +9,10 @@ authors = [
     { name = "Jorge Iván Gonzáles" },
     { name = "Juan José Mosquera" },
 ]
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "matplotlib>=3.11.1",
+    "mlflow>=3.16.0",
     "numpy>=2.4.6",
     "pandas>=3.0.5",
     "pytest>=9.1.1",
@@ -23,3 +24,17 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".claude", ".agents"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "ruff>=0.16.7",
+]

@@ -18,7 +18,7 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 
 ## Integrantes
 
-| Integrante                | 
+| Integrante                |
 |---------------------------|
 | Juliana Campuzano         |
 | Diego Fernando Garcés     |
