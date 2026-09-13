@@ -129,9 +129,10 @@ Las funciones T006, T007, T008 YA están en Phase 2 (Foundational) — esta es l
     - Usar `random_state=42` para reproducibilidad
     - Documentar en docstring: "In-context learning, no gradient training"
 - [X] T018 [US2] Crear `src/models/__init__.py` con importación de `TabPFNClassifier`
-- [ ] T019 [US2] ⛔ BLOQUEADA: TabPFN 8.5.0 exige aceptar la licencia de Prior Labs
-  (https://ux.priorlabs.ai/account/licenses) antes de descargar los pesos. Los tests de
-  TabPFN quedan en SKIPPED hasta entonces. Ejecutar validación manual de TabPFN:
+- [X] T019 [US2] Ejecutar validación manual de TabPFN. Requirió aceptar la licencia de
+  Prior Labs (https://ux.priorlabs.ai/accept-license?hf_repo_id=tabpfn_3) y habilitar
+  `ignore_pretraining_limits=True`, porque TabPFN bloquea por defecto CPU con >5000
+  muestras y X_train tiene 8000. Resultado: predicciones (2000, 2) válidas.
   ```bash
   cd <project-root>
   uv run python -c "from src.preprocessing import load_raw_data, build_features; from src.models import TabPFNClassifier; df = load_raw_data('data/raw/ai4i2020.csv'); X_train, y_train, X_test, y_test = build_features(df); clf = TabPFNClassifier(); proba = clf.predict_proba(X_train, y_train, X_test); print(f'Predictions shape: {proba.shape}, min: {proba.min():.3f}, max: {proba.max():.3f}')"
@@ -221,7 +222,7 @@ Las funciones T006, T007, T008 YA están en Phase 2 (Foundational) — esta es l
     - Loguear métricas: f1, recall, pr_auc
   - Usar `mlflow.set_experiment()` y `mlflow.start_run()` context manager
   - Documentar en docstring
-- [X] T030 [US4] Ejecutar validación manual de evaluación mediante `scripts/evaluar_modelos.py` (XGBoost: F1 0.729, Recall 0.750, PR-AUC 0.837; TabPFN pendiente de licencia):
+- [X] T030 [US4] Ejecutar validación manual de evaluación mediante `scripts/evaluar_modelos.py`. Resultado: TabPFN-v2 F1 0.825 / Recall 0.765 / PR-AUC 0.880 vs. XGBoost F1 0.729 / Recall 0.750 / PR-AUC 0.837. TabPFN-v2 gana en las tres métricas:
   ```bash
   cd <project-root>
   uv run python -c "
@@ -252,7 +253,7 @@ Las funciones T006, T007, T008 YA están en Phase 2 (Foundational) — esta es l
   ```
   - Verificar que ambos modelos producen métricas en rango [0, 1]
   - Verificar que se puede identificar cuál tiene mejor recall
-- [X] T031 [US4] Ejecutar MLflow logging y verificar en UI. Backend: `sqlite:///mlflow.db` (MLflow 3.16 dejó `./mlruns` en modo mantenimiento). Run `xgboost-baseline` registrado; falta `tabpfn-v2`:
+- [X] T031 [US4] Ejecutar MLflow logging y verificar en UI. Backend: `sqlite:///mlflow.db` (MLflow 3.16 dejó `./mlruns` en modo mantenimiento). Runs `tabpfn-v2` y `xgboost-baseline` registrados con sus tags y métricas:
   ```bash
   cd <project-root>
   uv run mlflow ui --port 5000 &
@@ -297,13 +298,13 @@ Las funciones T006, T007, T008 YA están en Phase 2 (Foundational) — esta es l
 
 - [X] T032 [P] Ejecutar `uv run ruff check .` y resolver cualquier issue de linting
 - [X] T033 [P] Ejecutar `uv run ruff format .` para formatear código
-- [X] T034 [P] Ejecutar todos los tests con `uv run pytest tests/` (43 passed, 10 skipped por licencia de TabPFN)
-- [ ] T035 Ejecutar validación end-to-end del quickstart.md (pasos 1, 3, 4 y 5 verificados; paso 2 bloqueado por licencia):
+- [X] T034 [P] Ejecutar todos los tests con `uv run pytest tests/` (53 passed, 0 skipped)
+- [X] T035 Ejecutar validación end-to-end del quickstart.md (los 5 pasos verificados):
   - Correr todos los 5 pasos del quickstart (Paso 1-5)
   - Verificar que cada paso produce output esperado
   - Documentar cualquier issue o ajuste necesario en quickstart.md
 - [X] T036 Documentar decisiones de implementación en `src/` (docstrings, comentarios en código)
-- [ ] T037 Crear o actualizar `README.md` con sección de "Resultados de la Feature 001"
+- [X] T037 Crear o actualizar `README.md` con sección de "Resultados de la Feature 001"
   - Incluir resumen de F1/Recall/PR-AUC de ambos modelos
   - Incluir link a MLflow runs: `http://localhost:5000`
 

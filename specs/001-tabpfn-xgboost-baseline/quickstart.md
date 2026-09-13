@@ -68,16 +68,16 @@ exactamente `f1`, `recall` y `pr_auc` —nunca accuracy— en el rango [0, 1].
 uv run python -m scripts.evaluar_modelos
 ```
 
-**Salida esperada** (los valores de TabPFN dependen de la ejecución):
+**Salida esperada**:
 
 ```text
 Train: (8000, 8) | Test: (2000, 8) | Fallos en test: 68
 
 Modelo             F1   Recall   PR-AUC
-TabPFN-v2       ...      ...      ...
-XGBoost        0.729    0.750    0.837
+TabPFN-v2       0.825    0.765    0.880
+XGBoost         0.729    0.750    0.837
 
-Mejor recall sobre la clase falla: ...
+Mejor recall sobre la clase falla: TabPFN-v2
 ```
 
 Luego abre la interfaz de MLflow:

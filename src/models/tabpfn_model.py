@@ -22,7 +22,14 @@ class TabPFNClassifier:
     def __init__(self, device: str = DEVICE_POR_DEFECTO, random_state: int = RANDOM_STATE):
         self.device = device
         self.random_state = random_state
-        self._estimator = _TabPFNEstimator(device=device, random_state=random_state)
+        # TabPFN bloquea por defecto CPU con >5000 muestras (nuestro X_train es de
+        # 8000). La constitución (Principio I) ya asume CPU como plataforma objetivo,
+        # así que se habilita explícitamente en vez de truncar el dataset.
+        self._estimator = _TabPFNEstimator(
+            device=device,
+            random_state=random_state,
+            ignore_pretraining_limits=True,
+        )
 
     def predict_proba(
         self,
