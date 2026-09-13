@@ -18,7 +18,7 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 
 ## Integrantes
 
-| Integrante                | 
+| Integrante                |
 |---------------------------|
 | Juliana Campuzano         |
 | Diego Fernando Garcés     |
@@ -43,7 +43,7 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 | Contenedor            | Docker *(pendiente — Módulo 3)*               |
 | Gestión de entorno    | uv                                             |
 | Pruebas               | pytest                                         |
-| Seguimiento de experimentos | MLflow *(previsto)*                      |
+| Seguimiento de experimentos | MLflow                                   |
 
 ---
 
@@ -126,6 +126,36 @@ uv run pytest
 
 ---
 
+## Resultados: Feature 001 — TabPFN-v2 vs. baseline XGBoost
+
+Clasificación binaria de `Machine failure` sobre AI4I 2020 (10.000 registros, ~3,4% de
+fallos). Split estratificado 80/20 con semilla fija; métricas medidas sobre los 2.000
+registros de prueba (68 fallos reales), siempre sobre la clase falla —nunca *accuracy*,
+que con este desbalance premiaría a un modelo que jamás alerta.
+
+| Modelo        | F1        | Recall    | PR-AUC    |
+|---------------|-----------|-----------|-----------|
+| **TabPFN-v2** | **0,825** | **0,765** | **0,880** |
+| XGBoost       | 0,729     | 0,750     | 0,837     |
+
+**TabPFN-v2 supera al baseline en las tres métricas**, sin entrenamiento por gradiente y
+sin ajuste de hiperparámetros: solo aprendizaje en contexto. XGBoost compite de cerca en
+recall (0,750 vs. 0,765) tras compensar el desbalance con `scale_pos_weight` = 28,52.
+
+Reproducir la comparativa y registrar ambos runs en MLflow:
+
+```bash
+uv run python -m scripts.evaluar_modelos
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
+```
+
+> TabPFN-v2 descarga sus pesos tras una aceptación de licencia única en
+> [ux.priorlabs.ai](https://ux.priorlabs.ai). Sin ella, sus pruebas se omiten
+> automáticamente. Detalle en
+> [specs/001-tabpfn-xgboost-baseline/quickstart.md](specs/001-tabpfn-xgboost-baseline/quickstart.md).
+
+---
+
 ## Estado del proyecto
 
 🚧 **En desarrollo — Módulo 2.**
@@ -134,9 +164,10 @@ uv run pytest
 |-------------------------------------------|---------------|
 | Estructura del repositorio                | ✅ Completado |
 | Carga y exploración del dataset AI4I 2020 | ⏳ En curso   |
-| Preprocesamiento y *feature engineering*  | ⏳ Pendiente  |
-| Modelo base TabPFN-v2                     | ⏳ Pendiente  |
-| Baselines (XGBoost / GB / TabPFN-Mix)     | ⏳ Pendiente  |
-| Evaluación y comparativa                  | ⏳ Pendiente  |
+| Preprocesamiento y *feature engineering*  | ✅ Completado |
+| Modelo base TabPFN-v2                     | ✅ Completado |
+| Baseline XGBoost                          | ✅ Completado |
+| Baselines opcionales (GB / TabPFN-Mix)    | ⏳ Pendiente  |
+| Evaluación y comparativa                  | ✅ Completado |
 | Interfaz Streamlit                        | ⏳ Pendiente  |
 | Contenedorización con Docker              | ⏳ Módulo 3   |
