@@ -51,6 +51,7 @@ Integrar TabPFN-v2 (preentrenado, in-context) como modelo base para clasificar f
 ✅ **Principio II (F1, Recall, PR-AUC solo)**: PASA. Explícitamente computadas, sin accuracy.
 ✅ **Principio III (Preprocesamiento mínimo)**: PASA. One-hot Type, split estratificado, StandardScaler solo para XGBoost si aplica.
 ✅ **Principio IV (CRISP-DM)**: PASA. Prep datos → Modelado → Evaluación → logging MLflow.
+✅ **Principio V (Tests con estructura AAA)**: PASA. Los 53 tests de `tests/` usan los bloques `# 1. ARRANGE`, `# 2. ACT` y `# 3. ASSERT`.
 ✅ **Matriz de Alcance**: PASA. Incluido: TabPFN-v2, XGBoost hoy, F1/recall/PR-AUC. Excluido (opcional): GradientBoosting, TabPFN-Mix.
 ✅ **Stack**: Python 3.12, uv, sklearn/xgboost/tabpfn, mlflow. Todas las dependencias declaradas en pyproject.toml.
 
