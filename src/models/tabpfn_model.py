@@ -20,6 +20,13 @@ class TabPFNClassifier:
     """Clasificador TabPFN-v2 preentrenado, sin entrenamiento por gradiente."""
 
     def __init__(self, device: str = DEVICE_POR_DEFECTO, random_state: int = RANDOM_STATE):
+        """Carga el estimador preentrenado de TabPFN-v2.
+
+        Args:
+            device: Dispositivo de inferencia; `"cpu"` es la plataforma objetivo
+                del proyecto, `"cuda"` si hay GPU disponible.
+            random_state: Semilla para que la inferencia sea reproducible.
+        """
         self.device = device
         self.random_state = random_state
         # TabPFN bloquea por defecto CPU con >5000 muestras (nuestro X_train es de
@@ -51,7 +58,14 @@ class TabPFNClassifier:
         return self._estimator.predict_proba(X_test)
 
     def save(self, filepath: str | Path) -> Path:
-        """Serializa el estado ajustado en formato nativo de TabPFN (FR-007)."""
+        """Serializa el estado ajustado en formato nativo de TabPFN (FR-007).
+
+        Args:
+            filepath: Ruta destino; los directorios intermedios se crean si faltan.
+
+        Returns:
+            La ruta donde quedó escrito el estado del modelo.
+        """
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
         self._estimator.save_fit_state(filepath)

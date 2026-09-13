@@ -15,6 +15,15 @@ RUTA_DATASET = "data/raw/ai4i2020.csv"
 
 
 def main() -> None:
+    """Evalúa los modelos seleccionados e imprime la comparación lado a lado.
+
+    Lee los argumentos de línea de comandos (`--dataset`, `--sin-tabpfn`), entrena
+    o infiere según corresponda, registra cada run en MLflow e imprime la tabla de
+    métricas junto al modelo con mejor recall.
+
+    Returns:
+        None. El resultado se comunica por salida estándar y por los runs de MLflow.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", default=RUTA_DATASET)
     parser.add_argument("--sin-tabpfn", action="store_true", help="Evalúa solo XGBoost")

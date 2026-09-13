@@ -31,7 +31,16 @@ line-length = 100
 extend-exclude = [".claude", ".agents"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "D"]
+# D203/D213 chocan con D211/D212 (misma decision, estilos opuestos).
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Los tests se documentan con la estructura AAA en el cuerpo, no con Args/Returns.
+"tests/**" = ["D103", "D100", "D104"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

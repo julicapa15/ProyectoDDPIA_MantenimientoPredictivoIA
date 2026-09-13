@@ -36,13 +36,35 @@ def test_ejemplo():
 
 **Rationale**: los comentarios explícitos permiten a cualquier integrante del equipo distinguir de un vistazo qué se prepara, qué se ejecuta y qué se verifica, sin leer la implementación. Cuando los datos provienen de una fixture, el bloque ARRANGE es la línea que la desempaqueta; si la fixture ya cacheó una operación costosa (por ejemplo, la inferencia de un modelo), el bloque ACT es la transformación que realmente se está probando.
 
+### VI. Docstrings con Formato Google (Args / Returns / Raises)
+
+Toda función, método y clase pública DEBE documentarse con un docstring en formato Google: una línea de resumen en imperativo, y las secciones `Args:`, `Returns:` y `Raises:` que apliquen, describiendo cada parámetro con su forma o unidad cuando sea relevante.
+
+```python
+def predict_proba(self, X_train, y_train, X_test) -> np.ndarray:
+    """Predice probabilidades de clase para X_test usando X_train como contexto.
+
+    Args:
+        X_train: Matriz de entrenamiento (n_train, n_features).
+        y_train: Etiquetas binarias (n_train,).
+        X_test: Matriz a predecir (n_test, n_features).
+
+    Returns:
+        Matriz (n_test, 2) con [P(no falla), P(falla)] por muestra.
+    """
+```
+
+**Rationale**: las formas de las matrices y el significado de cada valor no son evidentes desde la firma; documentarlos evita errores de integración entre módulos y permite que el equipo use el código sin leer su implementación.
+
+**Verificación**: se hace cumplir automáticamente con Ruff (`select = ["D"]`, `convention = "google"` en `pyproject.toml`), de modo que `uv run ruff check` falla si falta un docstring o una sección. Los tests quedan exentos de `Args:`/`Returns:` porque se documentan con la estructura AAA del Principio V.
+
 ## Matriz de Alcance
 
 ### INCLUIDO en el Proyecto Completo
 
 - Transfer learning con TabPFN-v2 (in-context, sin reentrenamiento)
 - Preprocesamiento mínimo (one-hot, split, normalizacion)
-- Baselines opcionales: XGBoost (Módulo 2), GradientBoosting (Módulo 2 extensión), TabPFN-Mix (future)
+- Baseline clásico: XGBoost (Módulo 2). TabPFN-Mix queda como referencia futura opcional
 - Interfaz Streamlit (Módulo 3)
 - Contenedorización Docker (Módulo 3)
 - Tracking de experimentos con MLflow
@@ -93,10 +115,11 @@ def test_ejemplo():
 
 Cada incremento de trabajo se organiza en una **feature de spec-kit** bajo `specs/<NNN>-<nombre>/`:
 
-- `specs/001-tabpfn-xgboost-baseline/` → Módulo 2, Sprint 1: TabPFN-v2 + XGBoost baseline
+- `specs/001-tabpfn-xgboost-baseline/` → Módulo 2, Sprint 1: TabPFN-v2 + XGBoost baseline ✅
 - `specs/002-eda-preprocesamiento/` → Módulo 2, Sprint 2: EDA + limpieza (compañero)
-- `specs/003-gradient-boosting-baseline/` → Módulo 2, Sprint 3: baseline GradientBoosting (extensión)
-- `specs/004-app-streamlit-docker/` → Módulo 3: interfaz + despliegue
+- `specs/003-app-streamlit-docker/` → Módulo 3: interfaz + despliegue
+
+El baseline GradientBoosting queda **descartado**: XGBoost ya cumple el rol de baseline clásico frente al cual contrastar TabPFN-v2, y añadir un segundo modelo de la misma familia no aportaría evidencia nueva.
 
 Cada feature contiene su propio `spec.md` (qué, por qué, criterio de éxito), `plan.md` (cómo, arquitectura), y `tasks.md` (tareas ordenadas). La **constitution** es el contrato que rige **todas** las features.
 
@@ -124,9 +147,10 @@ Toda feature (spec-kit `specify` → `tasks`) DEBE verificar:
 2. ¿Están explícitas las desviaciones si las hay?
 3. ¿Se loguean decisiones en el spec.md o comentarios de código?
 4. ¿Los tests siguen la estructura AAA del Principio V?
+5. ¿Todas las funciones públicas tienen docstring Google según el Principio VI? (`ruff check` lo valida)
 
 MLflow es el registro oficial de runs; cada run DEBE indicar a qué spec-kit feature pertenece (tag `spec-id: 001`, etc.).
 
 ---
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.2.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
