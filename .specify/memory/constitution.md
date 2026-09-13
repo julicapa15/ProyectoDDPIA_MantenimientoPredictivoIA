@@ -18,6 +18,24 @@ El preprocesamiento de hoy es deliberadamente mínimo: one-hot encoding de la va
 
 El proyecto sigue CRISP-DM (Fase 1: Negocio/Datos, Fase 2: Preparación, Fase 3: Modelado, Fase 4: Evaluación, Fase 5: Despliegue). Cada fase documenta sus entradas, salidas, decisiones y criterios de éxito. Spec-kit (constitution → specify → plan → tasks) goberna cada incremento dentro de este marco.
 
+### V. Tests con Estructura AAA (Arrange, Act, Assert)
+
+Todo test de pytest DEBE escribirse en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)`. Aplica a tests unitarios y de integración, sin excepción.
+
+```python
+def test_ejemplo():
+    # 1. ARRANGE (Preparar datos de entrada)
+    y = np.array([0] * 970 + [1] * 30)
+
+    # 2. ACT (Ejecutar la función bajo prueba)
+    modelo = XGBoostBaseline.from_class_balance(y)
+
+    # 3. ASSERT (Verificar el resultado esperado)
+    assert modelo.scale_pos_weight == pytest.approx(970 / 30)
+```
+
+**Rationale**: los comentarios explícitos permiten a cualquier integrante del equipo distinguir de un vistazo qué se prepara, qué se ejecuta y qué se verifica, sin leer la implementación. Cuando los datos provienen de una fixture, el bloque ARRANGE es la línea que la desempaqueta; si la fixture ya cacheó una operación costosa (por ejemplo, la inferencia de un modelo), el bloque ACT es la transformación que realmente se está probando.
+
 ## Matriz de Alcance
 
 ### INCLUIDO en el Proyecto Completo
@@ -105,9 +123,10 @@ Toda feature (spec-kit `specify` → `tasks`) DEBE verificar:
 1. ¿Respeta la constitución en cada task? (métricas, stack, scope, etc.)
 2. ¿Están explícitas las desviaciones si las hay?
 3. ¿Se loguean decisiones en el spec.md o comentarios de código?
+4. ¿Los tests siguen la estructura AAA del Principio V?
 
 MLflow es el registro oficial de runs; cada run DEBE indicar a qué spec-kit feature pertenece (tag `spec-id: 001`, etc.).
 
 ---
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.1.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
