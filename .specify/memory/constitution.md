@@ -1,50 +1,113 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# Mantenimiento Predictivo UAO — Constitución del Proyecto
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. TabPFN-v2 como Modelo Base (In-Context Learning)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+TabPFN-v2 es un transformer preentrenado para clasificación tabular que **NO requiere entrenamiento por gradiente**. No se proponen GridSearch, RandomizedSearch ni ajuste de hiperparámetros via gradiente. El modelo ingresa datos en contexto y produce predicciones directas. Esta decisión es definitiva para mantener la simpleza del pipeline y garantizar reproducibilidad en CPU.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Métricas Obligatorias: F1, Recall, PR-AUC (No Accuracy)
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+El dataset tiene desbalance ~3.4% en la clase "falla". **Nunca usar accuracy como métrica de éxito** — es engañosa con desbalance. Las métricas obligatorias son: **F1 sobre la clase falla, Recall (sensibilidad), y PR-AUC (Area under Precision-Recall curve)**. Cualquier baseline (XGBoost, GradientBoosting) se evalúa con estas mismas métricas.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Preprocesamiento Mínimo y Reemplazable
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+El preprocesamiento de hoy es deliberadamente mínimo: one-hot encoding de la variable `Type` (L/M/H), split estratificado por clase, y StandardScaler solo para baselines que lo requieran (TabPFN no lo requiere). Esta interfaz permite que trabajos posteriores de EDA/limpieza se inserten sin romper el pipeline de modelado actual.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. CRISP-DM como Marco de Fases
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+El proyecto sigue CRISP-DM (Fase 1: Negocio/Datos, Fase 2: Preparación, Fase 3: Modelado, Fase 4: Evaluación, Fase 5: Despliegue). Cada fase documenta sus entradas, salidas, decisiones y criterios de éxito. Spec-kit (constitution → specify → plan → tasks) goberna cada incremento dentro de este marco.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+## Matriz de Alcance
+
+### INCLUIDO en el Proyecto Completo
+
+- Transfer learning con TabPFN-v2 (in-context, sin reentrenamiento)
+- Preprocesamiento mínimo (one-hot, split, normalizacion)
+- Baselines opcionales: XGBoost (Módulo 2), GradientBoosting (Módulo 2 extensión), TabPFN-Mix (future)
+- Interfaz Streamlit (Módulo 3)
+- Contenedorización Docker (Módulo 3)
+- Tracking de experimentos con MLflow
+- Documentación del proyecto (README, constitución, specs)
+
+### EXCLUIDO (Out of Scope)
+
+- Entrenar TabPFN-v2 desde cero (preentrenado es el punto)
+- Series de tiempo / forecasting (problema de clasificación solo)
+- Hardware IoT / edge deployment (Módulo 3 define esto)
+- Multi-target: los 5 modos de falla (TWF/HDF/PWF/OSF/RNF) como targets separados — queda para extensión futura
+- EDA exhaustivo de dataset (la EDA formal la aporta el compañero en Módulo 2; hoy es mínimo)
+
+## Stack Técnico Fijo
+
+- **Python**: 3.12 (fijado en `pyproject.toml` y `.python-version`)
+- **Gestor de dependencias**: `uv` (0.12.3+)
+- **Librerías core**: `tabpfn>=8.5.0`, `xgboost>=3.2.0`, `scikit-learn>=1.9.0`, `pandas>=3.0.5`, `numpy>=2.4.6`
+- **Visualización**: `matplotlib>=3.11.1`
+- **ML Ops**: `mlflow>=3.16.0` (tracking de runs/métricas)
+- **Interfaz**: `streamlit>=1.63.0` (Módulo 3)
+- **Contenedor**: Docker (Módulo 3, puerto 8501)
+- **Calidad**: Ruff v0.16.7, pre-commit hooks, pytest
+
+### Justificación de Modelos
+
+**TabPFN-v2 como Modelo Base (Obligatorio)**:
+- Modelo fundacional pre-entrenado (in-context learning, sin fit por gradiente)
+- Model Card disponible en Hugging Face
+- Desempeño en datasets pequeños (<10k filas) respaldado por publicación científica (Nature, Hollmann et al., 2025)
+- Serialización: checkpoints PyTorch (`.ckpt` / `.safetensors`)
+
+**Baselines Clásicos (Opcionales, Módulo 2 extensión)**:
+- **XGBoost**: Baseline obligatorio en Módulo 2 Sprint 1 (hoy). Entrenado desde cero. Serialización: `.json` / `.ubj`
+- **Gradient Boosting (scikit-learn)**: Baseline opcional para extensión posterior. Entrenado desde cero. Serialización: `.pkl` / `.joblib`
+- **TabPFN-Mix**: Opcional, referencia dentro de la familia TabPFN para contrastar variantes. Serialización: `.ckpt` / `.safetensors`
+
+**Criterio**: TabPFN-v2 se elige como modelo base definitivo por ser pre-entrenado, científicamente respaldado y tener Model Card. Baselines se documentan como referentes clásicos contra los cuales validar desempeño de forma objetiva.
+
+### Preprocesamiento y Manejo del Desbalance
+
+- Dataset AI4I 2020 está limpio (sin valores faltantes)
+- Transformaciones esenciales: normalización/escalado de variables numéricas, one-hot de `Type` (L/M/H), split estratificado
+- Desbalance de clase (~3% falla): manejar con **class_weight** (automático en sklearn) o **SMOTE** (sobremuestreo sintético, opcional según task.md)
+- Interfaz de preprocesamiento clara en `src/preprocessing/` para que EDA posterior se integre sin romper pipeline de modelos
+
+## Desarrollo Dirigido por Especificación (Spec-Driven)
+
+Cada incremento de trabajo se organiza en una **feature de spec-kit** bajo `specs/<NNN>-<nombre>/`:
+
+- `specs/001-tabpfn-xgboost-baseline/` → Módulo 2, Sprint 1: TabPFN-v2 + XGBoost baseline
+- `specs/002-eda-preprocesamiento/` → Módulo 2, Sprint 2: EDA + limpieza (compañero)
+- `specs/003-gradient-boosting-baseline/` → Módulo 2, Sprint 3: baseline GradientBoosting (extensión)
+- `specs/004-app-streamlit-docker/` → Módulo 3: interfaz + despliegue
+
+Cada feature contiene su propio `spec.md` (qué, por qué, criterio de éxito), `plan.md` (cómo, arquitectura), y `tasks.md` (tareas ordenadas). La **constitution** es el contrato que rige **todas** las features.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+### Amendment Procedure
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+Cambios a esta constitución requieren:
+1. Justificación (problema concreto, restricción nueva, descubrimiento del equipo)
+2. Propuesta de enmienda (principio/sección modificada)
+3. Aprobación por consenso del equipo (incluir al profesor si afecta rubrica)
+4. Versionamiento semántico (ver abajo)
+5. Commit con referencia a la constitución anterior
+
+### Versioning Policy
+
+- **MAJOR** (1.0.0 → 2.0.0): Cambio incompatible en principios o matriz de alcance que invalida specs previas o decisiones pasadas
+- **MINOR** (1.0.0 → 1.1.0): Nuevo principio, nueva sección, o expansión significativa de guidance sin romper lo anterior
+- **PATCH** (1.0.0 → 1.0.1): Clarificaciones, fixes de typos, reordenamientos, ejemplos mejorados
+
+### Compliance Review
+
+Toda feature (spec-kit `specify` → `tasks`) DEBE verificar:
+1. ¿Respeta la constitución en cada task? (métricas, stack, scope, etc.)
+2. ¿Están explícitas las desviaciones si las hay?
+3. ¿Se loguean decisiones en el spec.md o comentarios de código?
+
+MLflow es el registro oficial de runs; cada run DEBE indicar a qué spec-kit feature pertenece (tag `spec-id: 001`, etc.).
+
+---
+
+**Version**: 1.0.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
