@@ -44,8 +44,7 @@ def load_data(path: Path = DATA_PATH) -> pd.DataFrame:
     """
     if not path.exists():
         raise FileNotFoundError(
-            f"No se encontro el dataset en {path}. "
-            "Verifica que data/raw/ai4i2020.csv exista."
+            f"No se encontro el dataset en {path}. Verifica que data/raw/ai4i2020.csv exista."
         )
     return pd.read_csv(path)
 
@@ -66,9 +65,7 @@ def save_summary_tables(df: pd.DataFrame, output_dir: Path) -> None:
     describe_df.to_csv(output_dir / "estadisticas_descriptivas.csv")
 
     total = len(df)
-    failure_counts = (
-        df["Machine failure"].value_counts().rename({0: "Sin falla", 1: "Con falla"})
-    )
+    failure_counts = df["Machine failure"].value_counts().rename({0: "Sin falla", 1: "Con falla"})
     failure_pct = (failure_counts / total * 100).round(2)
     balance_df = pd.DataFrame({"conteo": failure_counts, "porcentaje": failure_pct})
     balance_df.to_csv(output_dir / "balance_clases.csv")
@@ -95,7 +92,7 @@ def plot_class_balance(df: pd.DataFrame, figures_dir: Path) -> None:
     ax.set_title("Balance de clases: Machine failure")
     ax.set_ylabel("Numero de registros")
     ax.set_ylim(0, counts.values.max() * 1.15)
-    for bar, count in zip(bars, counts.values):
+    for bar, count in zip(bars, counts.values, strict=True):
         pct = count / len(df) * 100
         ax.annotate(
             f"{count}\n({pct:.1f}%)",
@@ -137,7 +134,7 @@ def plot_distributions(df: pd.DataFrame, figures_dir: Path) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(14, 8))
     axes = axes.flatten()
 
-    for ax, col in zip(axes, PROCESS_VARS):
+    for ax, col in zip(axes, PROCESS_VARS, strict=False):
         ax.hist(df[col], bins=30, color="#264653", edgecolor="white")
         ax.set_title(col)
 
@@ -160,7 +157,7 @@ def plot_boxplots_by_failure(df: pd.DataFrame, figures_dir: Path) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(14, 8))
     axes = axes.flatten()
 
-    for ax, col in zip(axes, PROCESS_VARS):
+    for ax, col in zip(axes, PROCESS_VARS, strict=False):
         sin_falla = df.loc[df["Machine failure"] == 0, col]
         con_falla = df.loc[df["Machine failure"] == 1, col]
         ax.boxplot([sin_falla, con_falla], tick_labels=["Sin falla", "Con falla"])
