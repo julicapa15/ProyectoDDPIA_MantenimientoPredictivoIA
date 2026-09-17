@@ -1,8 +1,8 @@
 """Analisis Exploratorio de Datos (EDA) - Dataset AI4I 2020 Predictive Maintenance.
 
 Genera tablas y graficas descriptivas del dataset usado en el proyecto de
-mantenimiento predictivo (Modulo 3), guardandolas en EDA/ para su uso
-en el informe.
+mantenimiento predictivo (Modulo 2, Sprint 2), guardandolas en EDA/ para
+su uso en el informe.
 
 Uso:
     uv run python EDA/eda.py
@@ -215,6 +215,8 @@ def main() -> None:
     print(f"Valores nulos totales: {df.isnull().sum().sum()}")
 
     save_summary_tables(df, OUTPUT_DIR)
+
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     plot_class_balance(df, FIGURES_DIR)
     plot_failure_modes(df, FIGURES_DIR)
     plot_distributions(df, FIGURES_DIR)

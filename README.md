@@ -55,11 +55,14 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 │   ├── raw/            # Datos originales sin procesar (AI4I 2020)
 │   └── processed/      # Datos limpios y transformados
 ├── notebooks/          # Exploración y prototipado
+├── EDA/                # Análisis exploratorio: script, tablas, figuras e informe
 ├── src/
 │   ├── preprocessing/  # Limpieza, ingeniería de características, splits
 │   ├── models/         # TabPFN-v2 y baselines
 │   └── evaluation/     # Métricas, curvas, comparativas
 ├── app/                # Interfaz Streamlit
+├── scripts/            # Entrypoints ejecutables (evaluación de modelos)
+├── specs/              # Especificaciones spec-kit por incremento
 ├── docker/             # Recursos de contenedorización
 ├── tests/              # Pruebas con pytest
 ├── docs/               # Documentación del proyecto
@@ -126,6 +129,35 @@ uv run pytest
 
 ---
 
+## Análisis exploratorio (EDA)
+
+Análisis descriptivo del dataset previo al modelado: balance de clases, modos de falla,
+distribuciones, comparación de variables según ocurrencia de falla y correlaciones.
+
+```bash
+uv run python EDA/eda.py
+```
+
+Genera cuatro tablas en `EDA/` y cinco figuras en `EDA/figures/`. El informe completo
+con las conclusiones está en **[EDA/informe_eda.md](EDA/informe_eda.md)**.
+
+Hallazgos que condicionan el modelado:
+
+- **Desbalance severo:** 339 fallos sobre 10.000 registros (3,39%), lo que descarta
+  *accuracy* como métrica y justifica F1, Recall y PR-AUC sobre la clase falla.
+- **Modos de falla desiguales:** HDF (115), OSF (98) y PWF (95) concentran los casos;
+  TWF (46) y RNF (19) son marginales.
+- **Torque y desgaste son las variables que más discriminan:** en los registros con
+  falla el torque medio sube de 39,6 a 50,2 Nm y el desgaste de 106,7 a 143,8 min,
+  mientras la velocidad baja de 1540 a 1496 rpm.
+- **Dos pares casi colineales:** temperatura de aire y de proceso (r = 0,88) y
+  velocidad de rotación con torque (r = −0,88). TabPFN-v2 lo maneja internamente, sin
+  selección manual de variables.
+- **RNF es ruido por definición:** no debería ser predecible desde las variables de
+  proceso; conviene tenerlo presente al interpretar el desempeño por modo de falla.
+
+---
+
 ## Resultados: Feature 001 — TabPFN-v2 vs. baseline XGBoost
 
 Clasificación binaria de `Machine failure` sobre AI4I 2020 (10.000 registros, ~3,4% de
@@ -154,6 +186,12 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 > automáticamente. Detalle en
 > [specs/001-tabpfn-xgboost-baseline/quickstart.md](specs/001-tabpfn-xgboost-baseline/quickstart.md).
 
+> **En Windows**, ese flujo interactivo falla con `OSError: [WinError 10038]`: la
+> librería usa `select()` sobre `stdin`, que en Windows solo admite sockets. La
+> solución es aceptar la licencia y generar una API key en
+> [ux.priorlabs.ai/account](https://ux.priorlabs.ai/account), y exportarla antes de
+> ejecutar — en PowerShell, `$env:TABPFN_TOKEN = "tu_api_key"`, con comillas.
+
 ---
 
 ## Estado del proyecto
@@ -163,7 +201,7 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 | Fase                                      | Estado        |
 |-------------------------------------------|---------------|
 | Estructura del repositorio                | ✅ Completado |
-| Carga y exploración del dataset AI4I 2020 | ⏳ En curso   |
+| Carga y exploración del dataset AI4I 2020 | ✅ Completado |
 | Preprocesamiento y *feature engineering*  | ✅ Completado |
 | Modelo base TabPFN-v2                     | ✅ Completado |
 | Baseline XGBoost                          | ✅ Completado |
