@@ -35,8 +35,15 @@ def main() -> None:
     resultados = {}
 
     if not args.sin_tabpfn:
-        proba = TabPFNClassifier().predict_proba(X_train, y_train, X_test)
-        resultados["TabPFN-v2"] = log_run_to_mlflow("tabpfn", y_test, proba[:, 1])
+        tabpfn = TabPFNClassifier()
+        proba = tabpfn.predict_proba(X_train, y_train, X_test)
+        resultados["TabPFN-v2"] = log_run_to_mlflow(
+            "tabpfn",
+            y_test,
+            proba[:, 1],
+            model=tabpfn,
+            dataset_path=args.dataset,
+        )
 
     modelo = XGBoostBaseline.from_class_balance(y_train)
     modelo.fit(X_train, y_train)
@@ -46,6 +53,8 @@ def main() -> None:
         y_test,
         proba[:, 1],
         params={"scale_pos_weight": round(modelo.scale_pos_weight, 4)},
+        model=modelo,
+        dataset_path=args.dataset,
     )
 
     print(f"\n{'Modelo':<12} {'F1':>8} {'Recall':>8} {'PR-AUC':>8}")
