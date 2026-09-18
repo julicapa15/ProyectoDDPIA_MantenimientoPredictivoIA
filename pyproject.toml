@@ -41,6 +41,8 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 # Los tests se documentan con la estructura AAA en el cuerpo, no con Args/Returns.
 "tests/**" = ["D103", "D100", "D104"]
+# En Streamlit, la manipulación de sys.path debe ocurrir antes de los imports de src.
+"app/**" = ["E402"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
