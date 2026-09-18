@@ -23,7 +23,7 @@ st.set_page_config(
 st.title("Mantenimiento Predictivo")
 st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
 
-model, X_train, y_train = load_model_and_context()
+model, _, _ = load_model_and_context()
 
 inputs = render_machine_form()
 
@@ -37,7 +37,7 @@ if inputs:
             inputs["torque"],
             inputs["tool_wear"],
         )
-        proba = model._estimator.predict_proba(X_new)
+        proba = model.predict_proba_con_contexto(X_new)
 
     render_results(
         proba=proba,
