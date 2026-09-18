@@ -31,6 +31,15 @@ def proba(datos_sinteticos):
         pytest.skip(SIN_LICENCIA)
 
 
+@pytest.fixture(scope="module")
+def modelo_con_contexto(datos_sinteticos):
+    X_train, y_train, _ = datos_sinteticos
+    try:
+        return TabPFNClassifier().fit_context(X_train, y_train)
+    except TabPFNLicenseError:
+        pytest.skip(SIN_LICENCIA)
+
+
 def test_se_instancia_sin_errores():
     # 1. ARRANGE (Sin preparación: se prueba el constructor por defecto)
 
@@ -89,3 +98,51 @@ def test_es_reproducible(datos_sinteticos):
 
     # 3. ASSERT (La semilla fija garantiza predicciones idénticas)
     assert np.allclose(primera, segunda)
+
+
+def test_fit_context_retorna_self(datos_sinteticos):
+    # 1. ARRANGE (Un clasificador nuevo y los datos sintéticos)
+    X_train, y_train, _ = datos_sinteticos
+    modelo = TabPFNClassifier()
+
+    # 2. ACT (Fijar el contexto y capturar el valor de retorno)
+    try:
+        retorno = modelo.fit_context(X_train, y_train)
+    except TabPFNLicenseError:
+        pytest.skip(SIN_LICENCIA)
+
+    # 3. ASSERT (Retorna la misma instancia para permitir encadenamiento)
+    assert retorno is modelo
+
+
+def test_predict_proba_con_contexto_es_equivalente_a_predict_proba(
+    modelo_con_contexto, proba, datos_sinteticos
+):
+    # 1. ARRANGE (Modelo con contexto fijado y probabilidades ya inferidas con
+    # la llamada de una sola etapa; ambas usan random_state=42 por defecto)
+    _, _, X_test = datos_sinteticos
+
+    # 2. ACT (Predecir usando el contexto ya fijado)
+    try:
+        resultado = modelo_con_contexto.predict_proba_con_contexto(X_test)
+    except TabPFNLicenseError:
+        pytest.skip(SIN_LICENCIA)
+
+    # 3. ASSERT (Mismas predicciones que predict_proba en una sola llamada)
+    np.testing.assert_allclose(resultado, proba)
+
+
+def test_encadenado_de_contexto_y_prediccion_es_equivalente(proba, datos_sinteticos):
+    # 1. ARRANGE (Datos sintéticos y clasificador nuevo)
+    X_train, y_train, X_test = datos_sinteticos
+
+    # 2. ACT (Fijar el contexto y predecir en la misma cadena)
+    try:
+        encadenado = (
+            TabPFNClassifier().fit_context(X_train, y_train).predict_proba_con_contexto(X_test)
+        )
+    except TabPFNLicenseError:
+        pytest.skip(SIN_LICENCIA)
+
+    # 3. ASSERT (La cadena da el mismo resultado que la llamada unitaria)
+    np.testing.assert_allclose(encadenado, proba)

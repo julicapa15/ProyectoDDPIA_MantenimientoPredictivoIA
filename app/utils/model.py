@@ -45,5 +45,5 @@ def load_model_and_context(
         X_ctx, y_ctx = X_train, y_train
 
     model = TabPFNClassifier()
-    model._estimator.fit(X_ctx, y_ctx)
+    model.fit_context(X_ctx, y_ctx)
     return model, X_ctx, y_ctx
