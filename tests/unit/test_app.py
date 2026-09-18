@@ -1,14 +1,17 @@
 """Tests unitarios para la interfaz Streamlit de mantenimiento predictivo.
 
-Ejercitan las funciones puras del módulo app.main sin necesidad de lanzar
-el servidor Streamlit. La estructura AAA sigue las reglas de AGENTS.md.
+Ejercitan las funciones puras de app.utils.physics y app.utils.preprocessing
+sin necesidad de lanzar el servidor Streamlit. La estructura AAA sigue las
+reglas de AGENTS.md.
 """
 
 import math
 
 import numpy as np
+import pytest
 
-from app.main import calculate_power, get_alert_level, preprocess_input
+from app.utils.physics import calculate_delta_t, calculate_power, get_alert_level
+from app.utils.preprocessing import preprocess_input
 
 # ── preprocess_input ─────────────────────────────────────────────────────────
 
@@ -235,3 +238,41 @@ def test_potencia_es_escalar():
 
     # 3. ASSERT
     assert isinstance(potencia, float)
+
+
+# ── calculate_delta_t ────────────────────────────────────────────────────────
+
+
+def test_delta_t_proceso_mayor():
+    # 1. ARRANGE
+    process_temp = 308.6
+    air_temp = 298.1
+
+    # 2. ACT
+    delta = calculate_delta_t(process_temp, air_temp)
+
+    # 3. ASSERT
+    assert delta == pytest.approx(10.5)
+
+
+def test_delta_t_iguales():
+    # 1. ARRANGE
+    temp = 300.0
+
+    # 2. ACT
+    delta = calculate_delta_t(temp, temp)
+
+    # 3. ASSERT
+    assert delta == 0.0
+
+
+def test_delta_t_aire_mayor():
+    # 1. ARRANGE
+    process_temp = 295.0
+    air_temp = 305.0
+
+    # 2. ACT
+    delta = calculate_delta_t(process_temp, air_temp)
+
+    # 3. ASSERT
+    assert delta == -10.0
