@@ -8,12 +8,47 @@ reglas de AGENTS.md.
 import math
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from app.utils.physics import calculate_delta_t, calculate_power, get_alert_level
 from app.utils.preprocessing import preprocess_input
+from src.preprocessing.preprocess import COLUMNA_TARGET, preprocess_features
 
 # ── preprocess_input ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("product_type", ["L", "M", "H"])
+def test_preprocess_input_produce_los_mismos_valores_que_preprocess_features_de_src(
+    product_type,
+):
+    # 1. ARRANGE (una fila cruda concreta, expresada en el esquema de src y en los
+    # 6 argumentos posicionales que recibe preprocess_input de la app; se parametriza
+    # sobre los 3 tipos porque un cruce entre Type_H/Type_L/Type_M solo se nota cuando
+    # el tipo evaluado no vale 0 en las tres columnas dummy)
+    air_temp, process_temp, rpm, torque, tool_wear = 298.1, 308.6, 1551, 42.8, 7
+    fila_cruda = pd.DataFrame(
+        [
+            {
+                "Type": product_type,
+                "Air temperature [K]": air_temp,
+                "Process temperature [K]": process_temp,
+                "Rotational speed [rpm]": rpm,
+                "Torque [Nm]": torque,
+                "Tool wear [min]": tool_wear,
+                COLUMNA_TARGET: 0,
+            }
+        ]
+    )
+
+    # 2. ACT (procesar la misma fila por los dos caminos de código independientes)
+    vector_src = (
+        preprocess_features(fila_cruda).drop(columns=[COLUMNA_TARGET]).to_numpy(dtype=float)
+    )
+    vector_app = preprocess_input(product_type, air_temp, process_temp, rpm, torque, tool_wear)
+
+    # 3. ASSERT (mismos 8 valores, en el mismo orden, para la misma fila de entrada)
+    np.testing.assert_array_equal(vector_src, vector_app)
 
 
 def test_preprocess_input_tipo_l():

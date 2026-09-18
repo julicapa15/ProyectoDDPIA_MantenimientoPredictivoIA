@@ -6,16 +6,12 @@ sin inicializar Streamlit.
 
 import numpy as np
 
-NOMBRE_FEATURES = [
-    "Type_H",
-    "Type_L",
-    "Type_M",
-    "Air temperature [K]",
-    "Process temperature [K]",
-    "Rotational speed [rpm]",
-    "Torque [Nm]",
-    "Tool wear [min]",
-]
+from src.preprocessing.preprocess import COLUMNAS_DUMMY, COLUMNAS_NUMERICAS
+
+# Única fuente de verdad para el orden de features: la misma que usa
+# `src.preprocessing.preprocess.preprocess_features()`. No hardcodear este orden
+# aquí; si cambia en `src/`, este módulo debe seguirlo automáticamente.
+NOMBRE_FEATURES = COLUMNAS_DUMMY + COLUMNAS_NUMERICAS
 
 # Rangos válidos extraídos del dataset AI4I 2020
 RANGOS_VALIDOS = {
@@ -38,7 +34,9 @@ def preprocess_input(
     """Convierte los 6 inputs del formulario en el vector de 8 features del modelo.
 
     Aplica one-hot encoding a `product_type` (L, M, H) y concatena con las
-    5 variables numéricas en el orden exacto que espera el clasificador.
+    5 variables numéricas, ordenadas según `NOMBRE_FEATURES` (derivado de
+    `src.preprocessing.preprocess`, la misma fuente que usa el pipeline de
+    entrenamiento) para que ambos preprocesamientos no puedan desalinearse.
 
     Args:
         product_type: Tipo de producto (`"L"`, `"M"` o `"H"`).
@@ -51,10 +49,17 @@ def preprocess_input(
     Returns:
         Array numpy de forma `(1, 8)` con los features en el orden del modelo.
     """
-    type_h = 1.0 if product_type == "H" else 0.0
-    type_l = 1.0 if product_type == "L" else 0.0
-    type_m = 1.0 if product_type == "M" else 0.0
+    valores_por_columna = {
+        "Type_H": 1.0 if product_type == "H" else 0.0,
+        "Type_L": 1.0 if product_type == "L" else 0.0,
+        "Type_M": 1.0 if product_type == "M" else 0.0,
+        "Air temperature [K]": air_temp,
+        "Process temperature [K]": process_temp,
+        "Rotational speed [rpm]": rpm,
+        "Torque [Nm]": torque,
+        "Tool wear [min]": tool_wear,
+    }
     return np.array(
-        [[type_h, type_l, type_m, air_temp, process_temp, rpm, torque, tool_wear]],
+        [[valores_por_columna[columna] for columna in NOMBRE_FEATURES]],
         dtype=float,
     )

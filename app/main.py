@@ -1,5 +1,12 @@
 """Orquestador principal de la interfaz de mantenimiento predictivo."""
 
+import sys
+from pathlib import Path
+
+# Streamlit ejecuta este archivo directamente, así que agrega `app/` al path y no la
+# raíz del proyecto. Sin esto, los imports `app.*` de abajo fallan con ModuleNotFoundError.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import streamlit as st
 
 from app.components.form import render_machine_form
