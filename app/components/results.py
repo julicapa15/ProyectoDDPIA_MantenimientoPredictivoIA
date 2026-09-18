@@ -3,7 +3,11 @@
 import numpy as np
 import streamlit as st
 
-from app.utils.physics import calculate_delta_t, calculate_power, get_alert_level
+from app.utils.physics import (
+    calculate_delta_t,
+    calculate_power,
+    get_alert_level,
+)
 from app.utils.preprocessing import NOMBRE_FEATURES
 
 
@@ -14,6 +18,7 @@ def render_results(
     torque: float,
     rpm: float,
     X_new: np.ndarray,
+    umbral_falla: float,
 ) -> None:
     """Renderiza la sección de resultados tras la inferencia.
 
@@ -27,9 +32,12 @@ def render_results(
         torque: Torque ingresado.
         rpm: Velocidad de rotación ingresada.
         X_new: Vector de features `(1, 8)` enviado al modelo.
+        umbral_falla: Umbral de decisión de Falla inminente, configurado en la
+            barra lateral por `render_alert_sensitivity`.
     """
     prob_falla = float(proba[0, 1])
-    alerta = get_alert_level(prob_falla)
+
+    alerta = get_alert_level(prob_falla, umbral_falla)
     potencia = calculate_power(torque, rpm)
     delta_t = calculate_delta_t(process_temp, air_temp)
 
