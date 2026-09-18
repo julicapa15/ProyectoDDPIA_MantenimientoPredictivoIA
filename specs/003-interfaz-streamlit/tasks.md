@@ -60,3 +60,42 @@
   clave mal asignada en `valores_por_columna`) que un test de solo-orden no vería —
   parametrizar sobre los 3 tipos es necesario porque un cruce entre `Type_H`/`Type_L` solo
   se nota cuando el tipo evaluado no vale 0 en las tres columnas dummy.
+
+## Phase 6: Slider de sensibilidad de alerta (rama `feat/slider-sensibilidad-alerta-jigg`)
+
+- [X] T016 Hacer configurable el umbral de Falla inminente en
+  `get_alert_level()` (`app/utils/physics.py`), agregando el parámetro
+  `umbral_falla` con default `UMBRAL_FALLA` (0.70) para no cambiar el
+  comportamiento por defecto. `UMBRAL_PRECAUCION` (0.30, FR-004) se mantiene
+  fijo — no se deriva ni se calcula a partir del umbral configurable — para no
+  inventar una fórmula que relacione ambos umbrales y para conservar las tres
+  bandas del semáforo (Normal / Precaución / Falla inminente) en todo el rango.
+- [X] T017 Agregar el slider "Sensibilidad de alerta" en
+  `app/components/settings.py` (`render_alert_sensitivity()`), montado en
+  `st.sidebar` para que esté siempre visible desde que se abre la app, no solo
+  tras predecir. Rango 35%-90% en pasos de 5% (`UMBRAL_FALLA_MIN` =
+  `UMBRAL_PRECAUCION + PASO_UMBRAL_FALLA`, para que el umbral de Falla nunca
+  pueda igualar al de Precaución y colapsar la banda intermedia), default 70%,
+  `key="umbral_sensibilidad_alerta"`. `app/main.py` lo renderiza antes del
+  formulario y pasa el resultado a `render_results()` como parámetro
+  `umbral_falla`; `results.py` ya no construye el slider ni depende de él.
+- [X] T018 Persistir el resultado de la predicción en `st.session_state`
+  (`app/main.py`, clave `resultado`). Necesario porque mover el slider
+  reejecuta el script de Streamlit de punta a punta; sin guardar el resultado
+  de la última inferencia, cada movimiento del slider lo haría desaparecer en
+  vez de solo recalcular el nivel de alerta sobre la misma probabilidad.
+- [X] T019 Agregar tests del umbral configurable en `tests/unit/test_app.py`:
+  casos puntuales de `get_alert_level(probabilidad, umbral_falla=...)` y el
+  test parametrizado `test_alert_level_mantiene_los_tres_niveles_en_todo_el_rango_del_slider`,
+  que recorre los 12 valores válidos del slider (35%-90% en pasos de 5%) y
+  verifica que los tres niveles (Normal, Precaución, Falla inminente) sigan
+  siendo alcanzables en cada uno — es el test que impide que la banda de
+  Precaución vuelva a colapsar en el extremo mínimo.
+
+**Decisión de diseño**: el slider de sensibilidad afecta únicamente la
+presentación en la interfaz (`get_alert_level()` vía `app/components/settings.py`
+y `results.py`). El umbral de evaluación de modelos en
+`src/evaluation/metrics.py` (`UMBRAL_POR_DEFECTO = 0.5`) permanece fijo y no se
+conecta al slider, para que las métricas F1/Recall/PR-AUC reportadas en el
+README y logueadas en MLflow sigan siendo reproducibles independientemente de
+cómo un operador ajuste la sensibilidad de alerta en la UI.

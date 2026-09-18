@@ -11,6 +11,7 @@ import streamlit as st
 
 from app.components.form import render_machine_form
 from app.components.results import render_results
+from app.components.settings import render_alert_sensitivity
 from app.utils.model import load_model_and_context
 from app.utils.preprocessing import preprocess_input
 
@@ -22,6 +23,8 @@ st.set_page_config(
 
 st.title("Mantenimiento Predictivo")
 st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
+
+umbral_falla = render_alert_sensitivity()
 
 model, _, _ = load_model_and_context()
 
@@ -39,11 +42,22 @@ if inputs:
         )
         proba = model.predict_proba_con_contexto(X_new)
 
+    st.session_state.resultado = {
+        "proba": proba,
+        "air_temp": inputs["air_temp"],
+        "process_temp": inputs["process_temp"],
+        "torque": inputs["torque"],
+        "rpm": inputs["rpm"],
+        "X_new": X_new,
+    }
+
+if "resultado" in st.session_state:
     render_results(
-        proba=proba,
-        air_temp=inputs["air_temp"],
-        process_temp=inputs["process_temp"],
-        torque=inputs["torque"],
-        rpm=inputs["rpm"],
-        X_new=X_new,
+        proba=st.session_state.resultado["proba"],
+        air_temp=st.session_state.resultado["air_temp"],
+        process_temp=st.session_state.resultado["process_temp"],
+        torque=st.session_state.resultado["torque"],
+        rpm=st.session_state.resultado["rpm"],
+        X_new=st.session_state.resultado["X_new"],
+        umbral_falla=umbral_falla,
     )
