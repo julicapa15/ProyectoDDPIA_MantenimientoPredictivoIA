@@ -18,11 +18,27 @@ dependencies = [
     "scikit-learn>=1.9.0",
     "streamlit>=1.63.0",
     "tabpfn>=8.5.0",
+    "torch>=2.14.0",
     "xgboost>=3.2.0",
 ]
 
 [tool.uv]
 package = false
+
+# torch es dependencia transitiva de tabpfn, pero se fija aqui como directa para
+# poder forzar el build CPU-only en Linux: el wheel por defecto de PyPI arrastra
+# el stack CUDA completo (cuda-toolkit, nvidia-cudnn/nccl/cusparselt/nvshmem,
+# triton), varios GB innecesarios ya que el proyecto solo corre inferencia en CPU
+# (device="cpu" fijo en src/models/tabpfn_model.py) — y es lo que agoto el disco
+# al construir la imagen Docker. macOS/Windows no se ven afectados: PyPI ya
+# distribuye esas plataformas sin CUDA.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.ruff]
 target-version = "py312"

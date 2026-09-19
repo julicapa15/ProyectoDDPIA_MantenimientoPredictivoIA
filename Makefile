@@ -20,6 +20,10 @@ PORT     := 8501
 MLFLOW_URI  := sqlite:///mlflow.db
 MLFLOW_PORT := 5000
 
+# API key de TabPFN (ux.priorlabs.ai/account) para docker-run. Se toma del
+# entorno si ya esta exportada; de lo contrario, `make TABPFN_TOKEN=... docker-run`.
+TABPFN_TOKEN ?=
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  HELP — Menú de comandos                                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -138,8 +142,8 @@ docker-build: ## Construye la imagen Docker del proyecto
 	docker build -t mantenimiento-predictivo .
 
 .PHONY: docker-run
-docker-run: ## Ejecuta la app en un contenedor Docker
-	docker run -p $(PORT):8501 mantenimiento-predictivo
+docker-run: ## Ejecuta la app en un contenedor Docker (monta ./data y reenvia TABPFN_TOKEN)
+	docker run --rm -p $(PORT):8501 -v "$(CURDIR)/data:/app/data" -e TABPFN_TOKEN=$(TABPFN_TOKEN) mantenimiento-predictivo
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  UTILIDADES — Limpieza y mantenimiento                                     ║

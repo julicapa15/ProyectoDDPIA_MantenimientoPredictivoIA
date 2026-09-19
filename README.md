@@ -40,7 +40,7 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 | Procesamiento         | pandas · NumPy · scikit-learn                  |
 | Visualización         | matplotlib                                     |
 | Interfaz              | Streamlit                                      |
-| Contenedor            | Docker *(pendiente — Módulo 3)*               |
+| Contenedor            | Docker (`python:3.12-slim` + `uv`)             |
 | Gestión de entorno    | uv                                             |
 | Pruebas               | pytest                                         |
 | Seguimiento de experimentos | MLflow                                   |
@@ -66,7 +66,7 @@ expone mediante una interfaz web en **Streamlit** y se empaqueta con **Docker**.
 ├── docker/             # Recursos de contenedorización
 ├── tests/              # Pruebas con pytest
 ├── docs/               # Documentación del proyecto
-├── Dockerfile          # Placeholder (Módulo 3)
+├── Dockerfile          # Imagen de producción (Streamlit + uv)
 ├── pyproject.toml      # Dependencias (uv)
 └── README.md
 ```
@@ -101,7 +101,7 @@ uv add <paquete>
 ## Ejecución de la aplicación
 
 ```bash
-uv run streamlit run app/app.py
+uv run streamlit run app/main.py
 ```
 
 La interfaz quedará disponible en `http://localhost:8501`.
@@ -110,14 +110,28 @@ La interfaz quedará disponible en `http://localhost:8501`.
 
 ## Ejecución con Docker
 
-> **Pendiente.** La contenedorización se implementará en el **Módulo 3**.
-> El `Dockerfile` actual es un placeholder.
+Requisitos: [Docker](https://docs.docker.com/get-docker/) y el dataset AI4I 2020 en
+`data/raw/ai4i2020.csv` (no se incluye en la imagen, ver `.dockerignore`: se monta
+como volumen igual que en desarrollo local).
 
 ```bash
-# Previsto para el Módulo 3
-# docker build -t mantenimiento-predictivo .
-# docker run -p 8501:8501 mantenimiento-predictivo
+# Construir la imagen
+docker build -t mantenimiento-predictivo .
+
+# Ejecutar montando el dataset y reenviando la API key de TabPFN
+docker run -p 8501:8501 \
+  -v "$(pwd)/data:/app/data" \
+  -e TABPFN_TOKEN="tu_api_key" \
+  mantenimiento-predictivo
 ```
+
+En PowerShell, sustituir `$(pwd)` por `${PWD}`. También puede usarse
+`make docker-build` y `make TABPFN_TOKEN=tu_api_key docker-run` (ver `Makefile`).
+
+La interfaz queda disponible en `http://localhost:8501`. Sin `TABPFN_TOKEN` (o sin
+licencia aceptada en [ux.priorlabs.ai](https://ux.priorlabs.ai)), la carga del
+modelo falla al iniciar — ver la nota de Windows/TabPFN más abajo en
+[Resultados](#resultados-feature-001--tabpfn-v2-vs-baseline-xgboost).
 
 ---
 
@@ -208,4 +222,4 @@ uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
 | Baselines opcionales (GB / TabPFN-Mix)    | ⏳ Pendiente  |
 | Evaluación y comparativa                  | ✅ Completado |
 | Interfaz Streamlit                        | ⏳ Pendiente  |
-| Contenedorización con Docker              | ⏳ Módulo 3   |
+| Contenedorización con Docker              | ✅ Completado |
