@@ -42,9 +42,12 @@ def test_from_class_balance_sin_positivos_lanza_error():
     # 1. ARRANGE (Etiquetas sin ningún caso de falla)
     y = np.zeros(100, dtype=int)
 
-    # 2. ACT + 3. ASSERT (No se puede ponderar una clase ausente)
-    with pytest.raises(ValueError, match="clase falla"):
+    # 2. ACT (Intentar derivar el peso de clase sin ningún positivo)
+    with pytest.raises(ValueError) as excinfo:
         XGBoostBaseline.from_class_balance(y)
+
+    # 3. ASSERT (El error explica que no hay clase falla que ponderar)
+    assert "clase falla" in str(excinfo.value)
 
 
 def test_fit_y_predict_proba(datos_sinteticos):
@@ -67,9 +70,12 @@ def test_predecir_sin_entrenar_falla(datos_sinteticos):
     _, _, X_test = datos_sinteticos
     modelo = XGBoostBaseline(scale_pos_weight=4.0)
 
-    # 2. ACT + 3. ASSERT (Predecir sin fit debe fallar explícitamente)
-    with pytest.raises(NotFittedError):
+    # 2. ACT (Predecir antes de haber llamado a fit)
+    with pytest.raises(NotFittedError) as excinfo:
         modelo.predict_proba(X_test)
+
+    # 3. ASSERT (El mensaje indica que falta entrenar el modelo)
+    assert "fit" in str(excinfo.value)
 
 
 def test_es_reproducible(datos_sinteticos):

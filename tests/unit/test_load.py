@@ -83,9 +83,12 @@ def test_archivo_inexistente_lanza_error(tmp_path):
     # 1. ARRANGE (Ruta a un archivo que no existe)
     ruta = tmp_path / "no_existe.csv"
 
-    # 2. ACT + 3. ASSERT (Cargar debe fallar con un error explícito)
-    with pytest.raises(FileNotFoundError):
+    # 2. ACT (Intentar cargar un archivo que no está en disco)
+    with pytest.raises(FileNotFoundError) as excinfo:
         load_raw_data(ruta)
+
+    # 3. ASSERT (El mensaje nombra la ruta que falta, para poder diagnosticarlo)
+    assert "no_existe.csv" in str(excinfo.value)
 
 
 def test_dataset_con_nulos_lanza_error(dataset_path, tmp_path):
@@ -95,6 +98,9 @@ def test_dataset_con_nulos_lanza_error(dataset_path, tmp_path):
     ruta_corrupta = tmp_path / "con_nulos.csv"
     df.to_csv(ruta_corrupta, index=False)
 
-    # 2. ACT + 3. ASSERT (La carga debe rechazarlo antes de modelar)
-    with pytest.raises(ValueError, match="valores faltantes"):
+    # 2. ACT (Intentar cargar el dataset con el nulo inyectado)
+    with pytest.raises(ValueError) as excinfo:
         load_raw_data(ruta_corrupta)
+
+    # 3. ASSERT (El error explica que hay valores faltantes por resolver)
+    assert "valores faltantes" in str(excinfo.value)

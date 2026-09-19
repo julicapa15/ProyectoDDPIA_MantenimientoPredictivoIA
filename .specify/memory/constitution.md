@@ -20,21 +20,24 @@ El proyecto sigue CRISP-DM (Fase 1: Negocio/Datos, Fase 2: Preparación, Fase 3:
 
 ### V. Tests con Estructura AAA (Arrange, Act, Assert)
 
-Todo test de pytest DEBE escribirse en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)`. Aplica a tests unitarios y de integración.
+Todo test de pytest DEBE escribirse en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)`. Aplica a tests unitarios y de integración, **sin excepción**.
 
-**Única excepción permitida — tests de excepciones (`pytest.raises`)**: cuando lo que se verifica es que una llamada falle, la ejecución y la verificación ocurren en la misma sentencia `with pytest.raises(...)` y no pueden separarse en dos bloques. En ese caso se usa un único bloque encabezado por el comentario literal `# 2. ACT + 3. ASSERT (...)`:
+**Tests de excepciones (`pytest.raises`)**: verificar que una llamada falle NO justifica fusionar bloques. Se captura la excepción con `as excinfo` y se afirma sobre ella en el bloque ASSERT, que además obliga a verificar el *mensaje* del error y no solo su tipo:
 
 ```python
 def test_archivo_inexistente_lanza_error(tmp_path):
     # 1. ARRANGE (Ruta a un archivo que no existe)
     ruta = tmp_path / "no_existe.csv"
 
-    # 2. ACT + 3. ASSERT (Cargar debe fallar con un error explícito)
-    with pytest.raises(FileNotFoundError):
+    # 2. ACT (Intentar cargar un archivo que no está en disco)
+    with pytest.raises(FileNotFoundError) as excinfo:
         load_raw_data(ruta)
+
+    # 3. ASSERT (El mensaje nombra la ruta que falta, para poder diagnosticarlo)
+    assert "no_existe.csv" in str(excinfo.value)
 ```
 
-Esta excepción NO aplica a ningún otro caso: si el acto y la aserción pueden separarse, deben separarse.
+No se usa el parámetro `match=` de `pytest.raises` para este fin: esconde la aserción dentro del bloque ACT, que es justo lo que el Principio V busca evitar.
 
 ```python
 def test_ejemplo():
@@ -168,6 +171,8 @@ MLflow es el registro oficial de runs; cada run DEBE indicar a qué spec-kit fea
 
 ---
 
-**Version**: 1.2.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-18
+**Version**: 1.2.2 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-18
+
+**Changelog v1.2.2 (PATCH)**: revierte la excepción al Principio V introducida en v1.2.1. Aquella enmienda permitía fusionar los bloques en un único `# 2. ACT + 3. ASSERT` para tests con `pytest.raises`, partiendo de que el acto y la aserción no podían separarse. **Esa premisa era incorrecta**: capturando la excepción con `as excinfo` sí se separan, y el bloque ASSERT resultante verifica el mensaje del error además de su tipo — es decir, la regla original no solo era aplicable, sino que produce mejores tests. Se decidió adaptar el código a la regla en vez de debilitar la regla para acomodar el código. Los 4 tests afectados (`tests/unit/test_load.py`, `tests/unit/test_xgboost.py`) se reescribieron en el mismo cambio, de modo que ningún test del repositorio incumple ya el Principio V.
 
 **Changelog v1.2.1 (PATCH)**: (1) Principio V — se documenta la excepción del bloque `# 2. ACT + 3. ASSERT` para tests con `pytest.raises`, formalizando una práctica ya presente y consistente en 4 tests del repositorio. (2) Desarrollo Dirigido por Especificación — se corrige el nombre de la feature 003 (`003-interfaz-streamlit`, no `003-app-streamlit-docker`), se registra el alcance final de la 002 y se lista la nueva feature `004-despliegue-docker`. Ningún principio cambia de contenido; solo se aclaran y se alinean con la realidad del repositorio.
