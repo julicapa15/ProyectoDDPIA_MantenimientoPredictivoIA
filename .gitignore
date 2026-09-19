@@ -43,6 +43,11 @@ mlflow.db
 Thumbs.db
 desktop.ini
 
+# ---- Evidencia de Archify (el diagrama y su fuente si se versionan) ----
+# Capturas y recibos que genera `archify visual-check`: son evidencia de una
+# corrida concreta, no entregables del repositorio.
+docs/*.visual-check.*
+
 # ---- IDE ----
 .vscode/
 .idea/
