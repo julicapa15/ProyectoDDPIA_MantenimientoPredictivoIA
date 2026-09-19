@@ -87,3 +87,55 @@ def test_es_reproducible(raw_df):
     # 3. ASSERT (El random_state fijo garantiza el mismo resultado)
     assert np.array_equal(X_train_a, X_train_b)
     assert np.array_equal(y_train_a, y_train_b)
+
+
+def test_features_no_tienen_nan(split_data):
+    # 1. ARRANGE (Matrices de entrenamiento y prueba)
+    X_train, y_train, X_test, y_test = split_data
+
+    # 2. ACT (Verificar si hay valores NaN en las matrices)
+    nan_en_train = np.isnan(X_train).any()
+    nan_en_test = np.isnan(X_test).any()
+
+    # 3. ASSERT (No debe haber valores faltantes en los features)
+    assert not nan_en_train
+    assert not nan_en_test
+
+
+def test_y_son_enteros(split_data):
+    # 1. ARRANGE (Etiquetas de entrenamiento y prueba)
+    _, y_train, _, y_test = split_data
+
+    # 2. ACT (Verificar el tipo de dato de las etiquetas)
+    tipo_train = y_train.dtype
+    tipo_test = y_test.dtype
+
+    # 3. ASSERT (Las etiquetas deben ser enteras)
+    assert np.issubdtype(tipo_train, np.integer)
+    assert np.issubdtype(tipo_test, np.integer)
+
+
+def test_train_y_test_sin_superposicion(split_data):
+    # 1. ARRANGE (Matrices de entrenamiento y prueba)
+    X_train, _, X_test, _ = split_data
+
+    # 2. ACT (Convertir filas a conjuntos de tuplas para comparar)
+    conjunto_train = set(map(tuple, X_train))
+    conjunto_test = set(map(tuple, X_test))
+
+    # 3. ASSERT (No hay filas idénticas en ambos conjuntos)
+    interseccion = conjunto_train & conjunto_test
+    assert len(interseccion) == 0
+
+
+def test_valores_min_max_coherentes(split_data):
+    # 1. ARRANGE (Matrices de entrenamiento y prueba)
+    X_train, _, X_test, _ = split_data
+
+    # 2. ACT (Calcular min y max globales)
+    minimo = min(X_train.min(), X_test.min())
+    maximo = max(X_train.max(), X_test.max())
+
+    # 3. ASSERT (Los valores están en rangos físicamente posibles, rpm puede llegar a ~2886)
+    assert minimo >= -1.0
+    assert maximo < 5000.0

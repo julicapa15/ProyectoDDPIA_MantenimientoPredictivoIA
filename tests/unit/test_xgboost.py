@@ -91,3 +91,41 @@ def test_es_reproducible(datos_sinteticos):
 
     # 3. ASSERT (La semilla fija garantiza predicciones idénticas)
     assert np.allclose(predicciones[0], predicciones[1])
+
+
+def test_fit_retorna_self(datos_sinteticos):
+    # 1. ARRANGE (Datos sintéticos y modelo ponderado)
+    X_train, y_train, _ = datos_sinteticos
+    modelo = XGBoostBaseline.from_class_balance(y_train)
+
+    # 2. ACT (Entrenar y capturar el valor de retorno)
+    retorno = modelo.fit(X_train, y_train)
+
+    # 3. ASSERT (fit retorna self para permitir encadenamiento)
+    assert retorno is modelo
+
+
+def test_guarda_modelo_en_disco(datos_sinteticos, tmp_path):
+    # 1. ARRANGE (Modelo entrenado y ruta de destino)
+    X_train, y_train, _ = datos_sinteticos
+    modelo = XGBoostBaseline.from_class_balance(y_train)
+    modelo.fit(X_train, y_train)
+    ruta_modelo = tmp_path / "modelo_test.json"
+
+    # 2. ACT (Serializar el modelo en disco)
+    ruta_guardada = modelo.save(ruta_modelo)
+
+    # 3. ASSERT (El archivo fue creado y tiene contenido)
+    assert ruta_guardada.exists()
+    assert ruta_guardada.stat().st_size > 0
+
+
+def test_from_class_balance_random_state_personalizado():
+    # 1. ARRANGE (Etiquetas con 970 negativos y 30 positivos)
+    y = np.array([0] * 970 + [1] * 30)
+
+    # 2. ACT (Construir el modelo con un random_state personalizado)
+    modelo = XGBoostBaseline.from_class_balance(y, random_state=123)
+
+    # 3. ASSERT (El random_state se propagó correctamente)
+    assert modelo.random_state == 123

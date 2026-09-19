@@ -111,3 +111,64 @@ def test_umbral_configurable():
     # 3. ASSERT (Bajar el umbral recupera el fallo que se escapaba)
     assert con_umbral_alto["recall"] == 0.0
     assert con_umbral_bajo["recall"] == 1.0
+
+
+def test_f1_se_anula_cuando_no_hay_prediccion_positiva():
+    # 1. ARRANGE (Probabilidades todas por debajo del umbral por defecto)
+    y_true = np.array([0, 0, 1, 1])
+    y_proba = np.array([0.1, 0.2, 0.3, 0.4])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (Sin predicciones positivas, F1 es cero)
+    assert metricas["f1"] == 0.0
+
+
+def test_pr_auc_penaliza_probabilidades_invertidas():
+    # 1. ARRANGE (Probabilidades invertidas: alta para no-falla, baja para falla)
+    y_true = np.array([0, 0, 1, 1])
+    y_proba = np.array([0.9, 0.8, 0.1, 0.2])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (PR-AUC por debajo de 0.5 porque el modelo invierte las clases)
+    assert metricas["pr_auc"] < 0.5
+
+
+def test_accuracy_paralela_con_f1_bajo():
+    # 1. ARRANGE (Modelo que predice todo como no-falla con 50/50 clases)
+    y_true = np.array([0, 0, 1, 1])
+    y_proba = np.array([0.0, 0.0, 0.0, 0.0])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (Accuracy es 0.5 pero F1 es 0 porque nunca detecta falla)
+    assert metricas["accuracy"] == pytest.approx(0.5)
+    assert metricas["f1"] == 0.0
+
+
+def test_recall_maximo_con_todo_sobre_umbral():
+    # 1. ARRANGE (Todos los casos de falla tienen alta probabilidad)
+    y_true = np.array([0, 0, 1, 1])
+    y_proba = np.array([0.1, 0.2, 0.9, 0.95])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (Todos los fallos detectados)
+    assert metricas["recall"] == pytest.approx(1.0)
+
+
+def test_metricas_cero_muestras_suficientes():
+    # 1. ARRANGE (Una sola falla real, bien detectada)
+    y_true = np.array([0, 1])
+    y_proba = np.array([0.1, 0.9])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (Con solo 2 muestras, las métricas son validas en [0, 1])
+    assert all(0.0 <= v <= 1.0 for v in metricas.values())

@@ -146,3 +146,31 @@ def test_encadenado_de_contexto_y_prediccion_es_equivalente(proba, datos_sinteti
 
     # 3. ASSERT (La cadena da el mismo resultado que la llamada unitaria)
     np.testing.assert_allclose(encadenado, proba)
+
+
+def test_device_cpu_por_defecto():
+    # 1. ARRANGE (Sin argumentos: se prueba el valor por defecto)
+
+    # 2. ACT (Instanciar el clasificador con configuración por defecto)
+    modelo = TabPFNClassifier()
+
+    # 3. ASSERT (El dispositivo por defecto es CPU, como exige la constitución)
+    assert modelo.device == "cpu"
+
+
+def test_guarda_modelo_en_disco(datos_sinteticos, tmp_path):
+    # 1. ARRANGE (Contexto fijado y ruta de destino)
+    X_train, y_train, _ = datos_sinteticos
+    modelo = TabPFNClassifier()
+    try:
+        modelo.fit_context(X_train, y_train)
+    except TabPFNLicenseError:
+        pytest.skip(SIN_LICENCIA)
+    ruta_modelo = tmp_path / "modelo_tabpfn.tabpfn_fit"
+
+    # 2. ACT (Serializar el estado del modelo en disco)
+    ruta_guardada = modelo.save(ruta_modelo)
+
+    # 3. ASSERT (El archivo fue creado y tiene contenido)
+    assert ruta_guardada.exists()
+    assert ruta_guardada.stat().st_size > 0

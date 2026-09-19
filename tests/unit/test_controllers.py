@@ -134,3 +134,51 @@ def test_las_claves_del_controlador_coinciden_con_los_parametros_de_la_vista(ent
 
     # 3. ASSERT (Controlador y vista hablan el mismo contrato, sin levantar Streamlit)
     assert set(vista) == parametros
+
+
+def test_ejecutar_prediccion_probabilidad_en_rango(entradas):
+    # 1. ARRANGE (Modelo falso con probabilidad conocida)
+    modelo = ModeloFalso(prob_falla=0.42)
+
+    # 2. ACT (Ejecutar la predicción)
+    resultado = ejecutar_prediccion(modelo, entradas)
+
+    # 3. ASSERT (La probabilidad está en el rango [0, 1])
+    prob_falla = float(resultado["proba"][0, 1])
+    assert 0.0 <= prob_falla <= 1.0
+
+
+def test_ejecutar_prediccion_guarda_X_new_numpy(entradas):
+    # 1. ARRANGE (Modelo falso)
+    modelo = ModeloFalso(prob_falla=0.15)
+
+    # 2. ACT (Ejecutar la predicción)
+    resultado = ejecutar_prediccion(modelo, entradas)
+
+    # 3. ASSERT (X_new es un array numpy de dtype float)
+    assert isinstance(resultado["X_new"], np.ndarray)
+    assert resultado["X_new"].dtype == float
+
+
+def test_derivar_vista_delta_t_y_potencia_coherentes(entradas):
+    # 1. ARRANGE (Predicción con entradas conocidas)
+    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.20), entradas)
+
+    # 2. ACT (Derivar la vista)
+    vista = derivar_vista(resultado, UMBRAL_FALLA)
+
+    # 3. ASSERT (ΔT = proceso − aire y potencia > 0 con valores reales)
+    assert vista["delta_t"] == pytest.approx(entradas["process_temp"] - entradas["air_temp"])
+    assert vista["potencia"] > 0.0
+
+
+def test_derivar_vista_proba_es_numpy(entradas):
+    # 1. ARRANGE (Predicción válida)
+    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.50), entradas)
+
+    # 2. ACT (Derivar la vista)
+    vista = derivar_vista(resultado, UMBRAL_FALLA)
+
+    # 3. ASSERT (proba es un array numpy con forma (1, 2))
+    assert isinstance(vista["proba"], np.ndarray)
+    assert vista["proba"].shape == (1, 2)

@@ -1,5 +1,7 @@
 """T010 [US1] Tests unitarios para preprocess_features()."""
 
+import pandas as pd
+
 from src.preprocessing import preprocess_features
 
 COLUMNAS_PROCESADAS = [
@@ -82,3 +84,56 @@ def test_no_muta_el_dataframe_original(raw_df):
 
     # 3. ASSERT (El DataFrame original queda intacto)
     assert list(raw_df.columns) == columnas_antes
+
+
+def test_dtype_float_en_columnas_numericas(raw_df):
+    # 1. ARRANGE (DataFrame crudo)
+    df = raw_df
+
+    # 2. ACT (Aplicar el preprocesamiento)
+    procesado = preprocess_features(df)
+
+    # 3. ASSERT (Las columnas numéricas se pueden usar como float en sklearn)
+    for col in [
+        "Air temperature [K]",
+        "Process temperature [K]",
+        "Rotational speed [rpm]",
+        "Torque [Nm]",
+        "Tool wear [min]",
+    ]:
+        assert pd.api.types.is_numeric_dtype(procesado[col])
+
+
+def test_dtype_float_en_dummies(raw_df):
+    # 1. ARRANGE (DataFrame crudo)
+    df = raw_df
+
+    # 2. ACT (Aplicar el preprocesamiento)
+    procesado = preprocess_features(df)
+
+    # 3. ASSERT (Las columnas dummy son float, no bool ni int)
+    for col in ["Type_H", "Type_L", "Type_M"]:
+        assert procesado[col].dtype == float
+
+
+def test_target_sigue_siendo_binario(raw_df):
+    # 1. ARRANGE (DataFrame crudo con target 0/1)
+    df = raw_df
+
+    # 2. ACT (Aplicar el preprocesamiento)
+    procesado = preprocess_features(df)
+
+    # 3. ASSERT (El target solo contiene 0 y 1 tras el preprocesamiento)
+    assert set(procesado["Machine failure"].unique()) <= {0, 1}
+
+
+def test_no_filas_adicionales_ni_perdidas(raw_df):
+    # 1. ARRANGE (DataFrame crudo de 10000 filas)
+    df = raw_df
+    n_filas_original = len(df)
+
+    # 2. ACT (Aplicar el preprocesamiento)
+    procesado = preprocess_features(df)
+
+    # 3. ASSERT (El preprocesamiento no agrega ni elimina filas)
+    assert len(procesado) == n_filas_original
