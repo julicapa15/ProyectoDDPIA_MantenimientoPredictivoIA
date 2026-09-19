@@ -1,0 +1,440 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Mantenimiento Predictivo con TabPFN-v2",
+    "output": "arquitectura.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1330,
+      680
+    ],
+    "repository": {
+      "url": "https://github.com/julicapa15/ProyectoDDPIA_MantenimientoPredictivoIA",
+      "provider": "github",
+      "revision": "5439a8b0720200eab19ec19c068e9be740ddddbc"
+    },
+    "views": [
+      {
+        "id": "ruta-inferencia",
+        "label": "Ruta de inferencia",
+        "focus": [
+          "operador",
+          "vista",
+          "controlador",
+          "dominio",
+          "tabpfn"
+        ],
+        "note": "Del formulario al semaforo: como una lectura de la maquina se convierte en una probabilidad de falla."
+      },
+      {
+        "id": "capas-mvc",
+        "label": "Separacion MVC",
+        "focus": [
+          "vista",
+          "controlador",
+          "dominio"
+        ],
+        "note": "La Vista solo dibuja, el Controlador coordina y el Modelo concentra el dominio."
+      },
+      {
+        "id": "evaluacion-offline",
+        "label": "Evaluacion offline",
+        "focus": [
+          "cli",
+          "preproc",
+          "tabpfn",
+          "xgboost",
+          "evaluacion",
+          "mlflow"
+        ],
+        "note": "Camino por consola que compara TabPFN-v2 contra el baseline sin pasar por la interfaz."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "operador",
+      "type": "external",
+      "label": "Operador",
+      "sublabel": "Navegador :8501",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        150,
+        72
+      ]
+    },
+    {
+      "id": "vista",
+      "type": "frontend",
+      "label": "Vista",
+      "sublabel": "app/components/",
+      "tag": "solo dibuja",
+      "pos": [
+        280,
+        80
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "app/components/form.py",
+          "label": "captura 6 variables"
+        },
+        {
+          "path": "app/components/results.py",
+          "label": "semaforo y metricas"
+        },
+        {
+          "path": "app/components/settings.py",
+          "label": "slider de sensibilidad"
+        }
+      ]
+    },
+    {
+      "id": "controlador",
+      "type": "backend",
+      "label": "Controlador",
+      "sublabel": "app/controllers/prediction.py",
+      "tag": "sin Streamlit",
+      "pos": [
+        540,
+        80
+      ],
+      "size": [
+        190,
+        72
+      ],
+      "sources": [
+        {
+          "path": "app/controllers/prediction.py",
+          "label": "ejecutar_prediccion / derivar_vista"
+        }
+      ]
+    },
+    {
+      "id": "dominio",
+      "type": "backend",
+      "label": "Modelo de la app",
+      "sublabel": "app/utils/",
+      "tag": "fisica y features",
+      "pos": [
+        810,
+        80
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "app/utils/physics.py",
+          "label": "potencia, delta T, alerta"
+        },
+        {
+          "path": "app/utils/preprocessing.py",
+          "label": "vector de 8 features"
+        },
+        {
+          "path": "app/utils/model.py",
+          "label": "TabPFN cacheado"
+        }
+      ]
+    },
+    {
+      "id": "preproc",
+      "type": "backend",
+      "label": "Preprocesamiento",
+      "sublabel": "src/preprocessing/",
+      "pos": [
+        280,
+        270
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "src/preprocessing/load.py",
+          "label": "valida el CSV"
+        },
+        {
+          "path": "src/preprocessing/features.py",
+          "label": "split estratificado 80/20"
+        }
+      ]
+    },
+    {
+      "id": "tabpfn",
+      "type": "backend",
+      "label": "TabPFN-v2",
+      "sublabel": "src/models/tabpfn_model.py",
+      "tag": "sin gradiente",
+      "pos": [
+        810,
+        270
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "src/models/tabpfn_model.py",
+          "label": "inferencia en contexto"
+        }
+      ]
+    },
+    {
+      "id": "evaluacion",
+      "type": "backend",
+      "label": "Evaluacion",
+      "sublabel": "src/evaluation/",
+      "tag": "F1 / Recall / PR-AUC",
+      "pos": [
+        1080,
+        270
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "src/evaluation/metrics.py",
+          "label": "metricas de la clase falla"
+        },
+        {
+          "path": "src/evaluation/tracking.py",
+          "label": "registro en MLflow"
+        }
+      ]
+    },
+    {
+      "id": "xgboost",
+      "type": "backend",
+      "label": "XGBoost",
+      "sublabel": "src/models/xgboost_baseline.py",
+      "tag": "baseline",
+      "pos": [
+        810,
+        420
+      ],
+      "size": [
+        180,
+        72
+      ],
+      "sources": [
+        {
+          "path": "src/models/xgboost_baseline.py",
+          "label": "scale_pos_weight"
+        }
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "CLI de evaluacion",
+      "sublabel": "scripts/evaluar_modelos.py",
+      "pos": [
+        60,
+        270
+      ],
+      "size": [
+        150,
+        72
+      ],
+      "sources": [
+        {
+          "path": "scripts/evaluar_modelos.py",
+          "label": "pipeline completo"
+        }
+      ]
+    },
+    {
+      "id": "dataset",
+      "type": "database",
+      "label": "AI4I 2020",
+      "sublabel": "data/raw/ai4i2020.csv",
+      "tag": "volumen montado",
+      "pos": [
+        280,
+        545
+      ],
+      "size": [
+        180,
+        72
+      ]
+    },
+    {
+      "id": "mlflow",
+      "type": "database",
+      "label": "MLflow",
+      "sublabel": "mlflow.db (SQLite)",
+      "pos": [
+        1080,
+        545
+      ],
+      "size": [
+        180,
+        72
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "app/ - Interfaz Streamlit (MVC)",
+      "wraps": [
+        "vista",
+        "controlador",
+        "dominio"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "src/ - Nucleo agnostico del framework",
+      "wraps": [
+        "preproc",
+        "tabpfn",
+        "evaluacion",
+        "xgboost"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "abre-la-app",
+      "from": "operador",
+      "to": "vista",
+      "label": "abre :8501",
+      "variant": "emphasis"
+    },
+    {
+      "id": "envia-variables",
+      "from": "vista",
+      "to": "controlador",
+      "label": "6 variables",
+      "variant": "emphasis"
+    },
+    {
+      "id": "arma-vector",
+      "from": "controlador",
+      "to": "dominio",
+      "label": "arma el vector",
+      "variant": "emphasis"
+    },
+    {
+      "id": "infiere",
+      "from": "dominio",
+      "to": "tabpfn",
+      "label": "contexto de 1.000 muestras",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 90
+    },
+    {
+      "id": "dibuja-resultado",
+      "from": "controlador",
+      "to": "vista",
+      "label": "alerta, potencia y delta T",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "contexto-de-referencia",
+      "from": "preproc",
+      "to": "tabpfn",
+      "label": "split 80/20",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "lee-el-dataset",
+      "from": "preproc",
+      "to": "dataset",
+      "label": "valida 10.000 filas",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 90
+    },
+    {
+      "id": "corre-el-pipeline",
+      "from": "cli",
+      "to": "preproc",
+      "label": "evaluacion offline",
+      "labelDy": 70
+    },
+    {
+      "id": "entrena-baseline",
+      "from": "preproc",
+      "to": "xgboost",
+      "label": "entrena desde cero",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "proba-tabpfn",
+      "from": "tabpfn",
+      "to": "evaluacion",
+      "label": "probabilidades"
+    },
+    {
+      "id": "proba-xgboost",
+      "from": "xgboost",
+      "to": "evaluacion",
+      "label": "probabilidades",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "labelSegment": 0
+    },
+    {
+      "id": "registra-runs",
+      "from": "evaluacion",
+      "to": "mlflow",
+      "label": "runs, metricas y artefactos",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 190
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Patron MVC",
+      "items": [
+        "La Vista no calcula: recibe valores ya resueltos",
+        "El Controlador no importa Streamlit, por eso es testeable",
+        "app/utils/ deriva de src/ el orden de las 8 features"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Modelo base",
+      "items": [
+        "TabPFN-v2 predice en contexto, sin ajuste por gradiente",
+        "La interfaz fija 1.000 muestras estratificadas para responder en 1-2 s en CPU",
+        "XGBoost entrena desde cero como referencia clasica"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Decisiones del dataset",
+      "items": [
+        "Desbalance del 3,39% en la clase falla",
+        "Criterio de exito: F1, Recall y PR-AUC, nunca accuracy",
+        "El CSV se monta como volumen: no viaja dentro de la imagen Docker"
+      ]
+    }
+  ]
+}
