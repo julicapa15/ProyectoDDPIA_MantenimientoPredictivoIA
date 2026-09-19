@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-14
 
-**Status**: Implementado (documentado retroactivamente — el código se construyó antes que esta especificación)
+**Status**: Implementado (documentado retroactivamente — el código se construyó antes que esta especificación). Alcance reducido respecto a su definición original — ver [Historial de Alcance](#historial-de-alcance-trazabilidad).
 
 **Input**: Generar un análisis exploratorio de datos (EDA) del dataset AI4I 2020, sencillo, aislado del resto de la app, que produzca gráficas y tablas para construir un informe con conclusiones, sin modificar el pipeline de modelado ya existente en `src/`.
 
@@ -69,3 +69,28 @@ Un integrante del equipo necesita entender la forma, el balance de clases y las 
 - El dataset está limpio (sin valores faltantes), tal como asume también la constitución del proyecto.
 - Esta feature es de solo lectura/análisis: no modifica `src/preprocessing/` ni el pipeline de modelado ya existente — es un insumo informativo adicional, aislado en `EDA/`.
 - No requiere pruebas unitarias en `tests/` (Principio V) porque no es un módulo de `src/` con lógica de negocio reutilizable, sino un script de análisis exploratorio de un solo uso; se verifica manualmente y con Ruff en su lugar.
+
+## Historial de Alcance (Trazabilidad)
+
+Esta feature se definió con un alcance y se cerró con otro. El cambio se registra aquí para dejar trazabilidad de la decisión, en vez de corregir la definición original en silencio.
+
+### Definición original — 2026-09-13, constitución v1.2.0
+
+La **Matriz de Alcance** de `.specify/memory/constitution.md` reserva esta feature como:
+
+> `specs/002-eda-preprocesamiento/` → Módulo 2, Sprint 2: EDA + limpieza (compañero)
+
+Es decir, el identificador comprometía **dos** entregables: el análisis exploratorio **y** la limpieza/preprocesamiento del dataset. De ahí el sufijo `-preprocesamiento` en el nombre del directorio.
+
+### Alcance final — 2026-09-18
+
+La feature se cierra cubriendo **únicamente el EDA**. La mitad de preprocesamiento no se implementó aquí, y no queda como deuda pendiente, por dos razones verificadas:
+
+1. **No hay limpieza que hacer.** El dataset AI4I 2020 no tiene valores faltantes. Lo confirman tres fuentes independientes: el informe de este EDA (`EDA/informe_eda.md`, sección 1), la constitución (*"Dataset AI4I 2020 está limpio (sin valores faltantes)"*), y `src/preprocessing/load.py`, que lanza `ValueError` si aparece cualquier nulo — condición que el test `tests/unit/test_load.py::test_sin_valores_faltantes` verifica en cada corrida.
+2. **El preprocesamiento ya existe, en la spec 001.** `src/preprocessing/preprocess.py` (one-hot de `Type`, descarte de columnas fuera de alcance) y `src/preprocessing/features.py` (split estratificado 80/20) implementan el Principio III de la constitución. Duplicarlo aquí habría creado dos pipelines compitiendo por la misma responsabilidad.
+
+### Consecuencia
+
+- El nombre del directorio `002-eda-preprocesamiento` **se conserva** para no romper las referencias ya existentes en la constitución, en los tags `spec_id` de MLflow y en el historial de commits. Su alcance real, sin embargo, es solo EDA.
+- **No queda trabajo pendiente** en esta feature por la parte de preprocesamiento.
+- Cualquier trabajo futuro que sí modifique el pipeline (por ejemplo, features derivadas como potencia mecánica o ΔT a partir de las correlaciones documentadas en el informe) **no pertenece a esta feature**: requiere una spec propia, porque cambiaría `src/preprocessing/` y por tanto las métricas ya reportadas en el README y registradas en MLflow.
