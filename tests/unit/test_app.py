@@ -382,3 +382,62 @@ def test_delta_t_aire_mayor():
 
     # 3. ASSERT
     assert delta == -10.0
+
+
+def test_preprocess_input_tool_wear_cero():
+    # 1. ARRANGE (Herramienta nueva sin desgaste)
+    product_type = "L"
+    tool_wear = 0.0
+
+    # 2. ACT (Procesar la entrada con tool_wear en cero)
+    resultado = preprocess_input(product_type, 298.1, 308.6, 1551, 42.8, tool_wear)
+
+    # 3. ASSERT (El desgaste cero queda registrado en la posición correcta)
+    assert resultado[0, 7] == 0.0
+
+
+def test_preprocess_input_tool_wear_alto():
+    # 1. ARRANGE (Herramienta con mucho desgaste)
+    product_type = "H"
+    tool_wear = 299.0
+
+    # 2. ACT (Procesar la entrada con tool_wear alto)
+    resultado = preprocess_input(product_type, 298.1, 308.6, 1551, 42.8, tool_wear)
+
+    # 3. ASSERT (El desgaste alto queda registrado correctamente)
+    assert resultado[0, 7] == 299.0
+
+
+def test_calculate_power_simetria():
+    # 1. ARRANGE (Dos pares torque-rpm que producen la misma potencia)
+    torque_a, rpm_a = 20.0, 100.0
+    torque_b, rpm_b = 10.0, 200.0
+
+    # 2. ACT (Calcular potencia para ambos pares)
+    potencia_a = calculate_power(torque_a, rpm_a)
+    potencia_b = calculate_power(torque_b, rpm_b)
+
+    # 3. ASSERT (P = tau * omega, ambos productos son iguales)
+    assert math.isclose(potencia_a, potencia_b, rel_tol=1e-9)
+
+
+def test_delta_t_negativo_grande():
+    # 1. ARRANGE (Aire mucho más caliente que el proceso)
+    process_temp = 280.0
+    air_temp = 320.0
+
+    # 2. ACT (Calcular ΔT)
+    delta = calculate_delta_t(process_temp, air_temp)
+
+    # 3. ASSERT (El ΔT negativo indica que el aire está más caliente)
+    assert delta == -40.0
+
+
+def test_alert_level_negative_probability():
+    # 1. ARRANGE (Probabilidad negativa, caso límite no físico)
+
+    # 2. ACT (Evaluar con probabilidad negativa)
+    nivel = get_alert_level(-0.1)
+
+    # 3. ASSERT (Cualquier valor por debajo de 0.30 es Normal)
+    assert nivel == "Normal"
