@@ -6,7 +6,6 @@ con `@st.cache_resource` para que no se recarguen en cada interacción.
 
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
 from sklearn.model_selection import train_test_split
 
@@ -18,9 +17,7 @@ N_CONTEXTO_WEB = 1000
 
 
 @st.cache_resource(show_spinner="Cargando datos y preparando TabPFN-v2...")
-def load_model_and_context(
-    n_samples: int = N_CONTEXTO_WEB,
-) -> tuple[TabPFNClassifier, np.ndarray, np.ndarray]:
+def load_model_and_context(n_samples: int = N_CONTEXTO_WEB) -> TabPFNClassifier:
     """Carga el dataset y prepara un contexto estratificado optimizado para CPU.
 
     Args:
@@ -28,7 +25,9 @@ def load_model_and_context(
             para lograr tiempos de respuesta de 1-2 segundos en CPU).
 
     Returns:
-        Tupla `(modelo, X_ctx, y_ctx)` lista para inferencia en tiempo real.
+        El clasificador con su contexto ya fijado, listo para inferencia en
+        tiempo real. No se devuelven `X_ctx`/`y_ctx`: tras `fit_context()` el
+        contexto vive dentro del modelo y ningún consumidor los necesita.
     """
     df = load_raw_data(DATASET_PATH)
     X_train, y_train, _, _ = build_features(df)
@@ -44,6 +43,4 @@ def load_model_and_context(
     else:
         X_ctx, y_ctx = X_train, y_train
 
-    model = TabPFNClassifier()
-    model.fit_context(X_ctx, y_ctx)
-    return model, X_ctx, y_ctx
+    return TabPFNClassifier().fit_context(X_ctx, y_ctx)
