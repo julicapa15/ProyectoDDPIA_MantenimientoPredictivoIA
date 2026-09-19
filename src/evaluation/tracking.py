@@ -43,8 +43,10 @@ LICENCIA_MODELO = {
 }
 
 # Cada modelo se empaca con su propio `save()`, en formato nativo (FR-007).
+# TabPFN exige que la ruta termine exactamente en ".tabpfn_fit"
+# (tabpfn.model_loading.save_fitted_tabpfn_model: "Path must end with .tabpfn_fit").
 EXTENSION_MODELO = {
-    "tabpfn": ".tabpfn",
+    "tabpfn": ".tabpfn_fit",
     "xgboost": ".json",
 }
 
@@ -220,6 +222,10 @@ def _log_artefactos(
         try:
             model.save(ruta_modelo)
         except Exception as error:
+            # Un empaquetado fallido no debe tumbar una evaluación de varios minutos, pero
+            # tampoco puede pasar desapercibido entre la salida de consola: se deja como tag
+            # visible en el propio run de MLflow.
+            mlflow.set_tag("model_artifact_error", f"{type(error).__name__}: {error}")
             print(f"Advertencia: no se pudo empacar el modelo {model_type} ({error})")
         else:
             mlflow.log_artifact(str(ruta_modelo), artifact_path="model")
