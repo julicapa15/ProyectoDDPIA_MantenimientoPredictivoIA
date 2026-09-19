@@ -15,6 +15,11 @@ STREAMLIT:= uv run streamlit
 APP_FILE := app/main.py
 PORT     := 8501
 
+# Backend de MLflow: debe coincidir con TRACKING_URI_POR_DEFECTO en
+# src/evaluation/tracking.py, o la UI abre un store vacio sin ningun run.
+MLFLOW_URI  := sqlite:///mlflow.db
+MLFLOW_PORT := 5000
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  HELP — Menú de comandos                                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -154,7 +159,7 @@ pre-commit: ## Ejecuta pre-commit en todos los archivos
 
 .PHONY: mlflow
 mlflow: ## Abre la UI de MLflow en el navegador
-	$(PYTHON) -m mlflow ui
+	uv run mlflow ui --backend-store-uri $(MLFLOW_URI) --port $(MLFLOW_PORT)
 
 .PHONY: status
 status: ## Muestra el estado del proyecto (Python, dependencias, git)

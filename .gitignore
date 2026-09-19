@@ -11,6 +11,12 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# ---- Cobertura de tests (make coverage) ----
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 .ipynb_checkpoints/
 
 # ---- Datos pesados (se conservan los .gitkeep) ----
