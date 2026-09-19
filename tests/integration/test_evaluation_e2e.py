@@ -1,6 +1,7 @@
 """T026 [US4] Test de integración: evaluación de ambos modelos y logging a MLflow."""
 
 import mlflow
+import pandas as pd
 import pytest
 
 from src.evaluation import compute_metrics, log_run_to_mlflow
@@ -70,6 +71,58 @@ def test_logging_registra_run_con_tags_y_metricas(xgboost_proba, split_data, tmp
     assert run["metrics.f1"] == pytest.approx(metricas["f1"])
     assert run["metrics.recall"] == pytest.approx(metricas["recall"])
     assert run["metrics.pr_auc"] == pytest.approx(metricas["pr_auc"])
+
+
+def test_logging_registra_latencia_y_throughput_si_se_pasa_el_tiempo(
+    xgboost_proba, split_data, tmp_path
+):
+    # 1. ARRANGE (Predicciones del baseline y un tiempo de predicción simulado)
+    _, _, _, y_test = split_data
+    tracking_uri = f"sqlite:///{tmp_path.as_posix()}/mlflow.db"
+
+    # 2. ACT (Registrar el run pasando tiempo_prediccion_seg)
+    metricas = log_run_to_mlflow(
+        model_type="xgboost",
+        y_true=y_test,
+        y_proba_pos=xgboost_proba[:, 1],
+        experiment="test-latencia",
+        tracking_uri=tracking_uri,
+        tiempo_prediccion_seg=2.0,
+    )
+
+    # 3. ASSERT (Latencia y throughput quedan en las métricas retornadas y en el run)
+    run = mlflow.search_runs(experiment_names=["test-latencia"]).iloc[0]
+    n_muestras = len(y_test)
+    assert metricas["latencia_ms_por_muestra"] == pytest.approx(2.0 * 1000 / n_muestras)
+    assert metricas["throughput_muestras_seg"] == pytest.approx(n_muestras / 2.0)
+    assert run["metrics.latencia_ms_por_muestra"] == pytest.approx(
+        metricas["latencia_ms_por_muestra"]
+    )
+    assert run["metrics.throughput_muestras_seg"] == pytest.approx(
+        metricas["throughput_muestras_seg"]
+    )
+
+
+def test_logging_no_registra_latencia_ni_throughput_sin_tiempo(xgboost_proba, split_data, tmp_path):
+    # 1. ARRANGE (Predicciones del baseline, sin pasar tiempo_prediccion_seg)
+    _, _, _, y_test = split_data
+    tracking_uri = f"sqlite:///{tmp_path.as_posix()}/mlflow.db"
+
+    # 2. ACT (Registrar el run sin el parámetro de tiempo)
+    metricas = log_run_to_mlflow(
+        model_type="xgboost",
+        y_true=y_test,
+        y_proba_pos=xgboost_proba[:, 1],
+        experiment="test-sin-latencia",
+        tracking_uri=tracking_uri,
+    )
+
+    # 3. ASSERT (Ni las métricas retornadas ni el run incluyen latencia/throughput)
+    assert "latencia_ms_por_muestra" not in metricas
+    assert "throughput_muestras_seg" not in metricas
+    run = mlflow.search_runs(experiment_names=["test-sin-latencia"]).iloc[0]
+    assert pd.isna(run.get("metrics.latencia_ms_por_muestra"))
+    assert pd.isna(run.get("metrics.throughput_muestras_seg"))
 
 
 def test_logging_registra_artefactos_y_tags_de_trazabilidad(split_data, xgboost_proba, tmp_path):

@@ -5,10 +5,10 @@ import pytest
 
 from src.evaluation import compute_metrics
 
-METRICAS_ESPERADAS = {"f1", "recall", "pr_auc"}
+METRICAS_ESPERADAS = {"f1", "recall", "pr_auc", "accuracy"}
 
 
-def test_retorna_las_tres_metricas_obligatorias():
+def test_retorna_las_cuatro_metricas():
     # 1. ARRANGE (Etiquetas reales y probabilidades predichas)
     y_true = np.array([0, 0, 1, 1])
     y_proba = np.array([0.1, 0.2, 0.8, 0.9])
@@ -16,20 +16,23 @@ def test_retorna_las_tres_metricas_obligatorias():
     # 2. ACT (Calcular las métricas)
     metricas = compute_metrics(y_true, y_proba)
 
-    # 3. ASSERT (Exactamente F1, Recall y PR-AUC)
+    # 3. ASSERT (Exactamente F1, Recall, PR-AUC y accuracy)
     assert set(metricas) == METRICAS_ESPERADAS
 
 
-def test_no_incluye_accuracy():
-    # 1. ARRANGE (Un caso mínimo cualquiera)
-    y_true = np.array([0, 1])
-    y_proba = np.array([0.2, 0.8])
+def test_accuracy_no_es_engañosamente_alta_con_desbalance():
+    # 1. ARRANGE (Un modelo que nunca predice falla, con fuerte desbalance)
+    rng = np.random.default_rng(7)
+    y_true = (rng.random(200) < 0.05).astype(int)
+    y_proba = np.zeros(200)
 
     # 2. ACT (Calcular las métricas)
     metricas = compute_metrics(y_true, y_proba)
 
-    # 3. ASSERT (La constitución prohíbe accuracy con clase desbalanceada)
-    assert "accuracy" not in metricas
+    # 3. ASSERT (Accuracy es alta pese a que el modelo es inútil: por eso no es criterio de éxito)
+    assert metricas["accuracy"] > 0.9
+    assert metricas["recall"] == 0.0
+    assert metricas["f1"] == 0.0
 
 
 def test_prediccion_perfecta():
@@ -82,6 +85,18 @@ def test_todas_las_metricas_en_rango_cero_uno():
 
     # 3. ASSERT (Ninguna métrica se sale de [0, 1])
     assert all(0.0 <= valor <= 1.0 for valor in metricas.values())
+
+
+def test_accuracy_cuenta_aciertos_totales():
+    # 1. ARRANGE (Cuatro muestras, tres clasificadas correctamente)
+    y_true = np.array([0, 0, 1, 1])
+    y_proba = np.array([0.1, 0.2, 0.9, 0.3])
+
+    # 2. ACT (Calcular las métricas)
+    metricas = compute_metrics(y_true, y_proba)
+
+    # 3. ASSERT (3 de 4 aciertos: 0.75)
+    assert metricas["accuracy"] == pytest.approx(0.75)
 
 
 def test_umbral_configurable():

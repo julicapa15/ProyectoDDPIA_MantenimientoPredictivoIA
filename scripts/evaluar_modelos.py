@@ -6,6 +6,7 @@ Se ejecuta como módulo para que la raíz del proyecto quede en el path de impor
 """
 
 import argparse
+import time
 
 from src.evaluation import log_run_to_mlflow
 from src.models import TabPFNClassifier, XGBoostBaseline
@@ -36,18 +37,23 @@ def main() -> None:
 
     if not args.sin_tabpfn:
         tabpfn = TabPFNClassifier()
+        inicio = time.perf_counter()
         proba = tabpfn.predict_proba(X_train, y_train, X_test)
+        tiempo_prediccion = time.perf_counter() - inicio
         resultados["TabPFN-v2"] = log_run_to_mlflow(
             "tabpfn",
             y_test,
             proba[:, 1],
             model=tabpfn,
             dataset_path=args.dataset,
+            tiempo_prediccion_seg=tiempo_prediccion,
         )
 
     modelo = XGBoostBaseline.from_class_balance(y_train)
     modelo.fit(X_train, y_train)
+    inicio = time.perf_counter()
     proba = modelo.predict_proba(X_test)
+    tiempo_prediccion = time.perf_counter() - inicio
     resultados["XGBoost"] = log_run_to_mlflow(
         "xgboost",
         y_test,
@@ -55,6 +61,7 @@ def main() -> None:
         params={"scale_pos_weight": round(modelo.scale_pos_weight, 4)},
         model=modelo,
         dataset_path=args.dataset,
+        tiempo_prediccion_seg=tiempo_prediccion,
     )
 
     print(f"\n{'Modelo':<12} {'F1':>8} {'Recall':>8} {'PR-AUC':>8}")
