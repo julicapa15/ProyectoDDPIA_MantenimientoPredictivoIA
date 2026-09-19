@@ -55,7 +55,19 @@ def get_alert_level(probability: float, umbral_falla: float = UMBRAL_FALLA) -> s
 
     Returns:
         `"Normal"`, `"Precaucion"` o `"Falla inminente"`.
+
+    Raises:
+        ValueError: Si `umbral_falla` es menor que `UMBRAL_PRECAUCION`. Con un
+            umbral así la banda de Precaución nunca se alcanza y el semáforo
+            pasaría de Normal a Falla inminente sin aviso intermedio; el slider
+            de la interfaz lo impide, pero la función no puede confiar en eso.
     """
+    if umbral_falla < UMBRAL_PRECAUCION:
+        raise ValueError(
+            f"umbral_falla ({umbral_falla}) no puede ser menor que "
+            f"UMBRAL_PRECAUCION ({UMBRAL_PRECAUCION}): colapsaría la banda de Precaucion"
+        )
+
     if probability < UMBRAL_PRECAUCION:
         return "Normal"
     if probability < umbral_falla:

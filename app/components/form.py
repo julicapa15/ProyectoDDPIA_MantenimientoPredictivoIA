@@ -1,6 +1,13 @@
-"""Formulario interactivo para captura de variables de la máquina."""
+"""Formulario interactivo para captura de variables de la máquina.
+
+Vista del patrón MVC: solo captura entradas. Los límites de cada campo salen de
+`RANGOS_VALIDOS` (`app/utils/preprocessing.py`), única fuente de verdad, para
+que el formulario no pueda aceptar valores fuera del dominio del dataset.
+"""
 
 import streamlit as st
+
+from app.utils.preprocessing import RANGOS_VALIDOS
 
 
 def render_machine_form() -> dict[str, float | str] | None:
@@ -19,8 +26,8 @@ def render_machine_form() -> dict[str, float | str] | None:
         with col_desgaste:
             tool_wear = st.number_input(
                 "Desgaste de herramienta [min]",
-                min_value=0.0,
-                max_value=300.0,
+                min_value=RANGOS_VALIDOS["tool_wear"][0],
+                max_value=RANGOS_VALIDOS["tool_wear"][1],
                 value=0.0,
                 step=1.0,
             )
@@ -29,16 +36,16 @@ def render_machine_form() -> dict[str, float | str] | None:
         with col_temp1:
             air_temp = st.number_input(
                 "Temperatura del aire [K]",
-                min_value=290.0,
-                max_value=320.0,
+                min_value=RANGOS_VALIDOS["air_temp"][0],
+                max_value=RANGOS_VALIDOS["air_temp"][1],
                 value=298.1,
                 step=0.1,
             )
         with col_temp2:
             process_temp = st.number_input(
                 "Temperatura del proceso [K]",
-                min_value=300.0,
-                max_value=330.0,
+                min_value=RANGOS_VALIDOS["process_temp"][0],
+                max_value=RANGOS_VALIDOS["process_temp"][1],
                 value=308.6,
                 step=0.1,
             )
@@ -47,16 +54,16 @@ def render_machine_form() -> dict[str, float | str] | None:
         with col_rpm:
             rpm = st.number_input(
                 "Velocidad de rotación [rpm]",
-                min_value=1000.0,
-                max_value=3000.0,
+                min_value=RANGOS_VALIDOS["rpm"][0],
+                max_value=RANGOS_VALIDOS["rpm"][1],
                 value=1500.0,
                 step=1.0,
             )
         with col_torque:
             torque = st.number_input(
                 "Torque [Nm]",
-                min_value=1.0,
-                max_value=100.0,
+                min_value=RANGOS_VALIDOS["torque"][0],
+                max_value=RANGOS_VALIDOS["torque"][1],
                 value=40.0,
                 step=0.1,
             )

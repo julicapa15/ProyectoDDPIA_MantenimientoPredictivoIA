@@ -1,24 +1,22 @@
-"""Renderizado de resultados: alertas, métricas y detalles técnicos."""
+"""Renderizado de resultados: alertas, métricas y detalles técnicos.
+
+Vista del patrón MVC: solo dibuja valores ya resueltos por
+`app/controllers/prediction.py`. No invoca funciones de dominio ni deriva
+magnitudes propias.
+"""
 
 import numpy as np
 import streamlit as st
 
-from app.utils.physics import (
-    calculate_delta_t,
-    calculate_power,
-    get_alert_level,
-)
 from app.utils.preprocessing import NOMBRE_FEATURES
 
 
 def render_results(
     proba: np.ndarray,
-    air_temp: float,
-    process_temp: float,
-    torque: float,
-    rpm: float,
     X_new: np.ndarray,
-    umbral_falla: float,
+    alerta: str,
+    potencia: float,
+    delta_t: float,
 ) -> None:
     """Renderiza la sección de resultados tras la inferencia.
 
@@ -27,19 +25,13 @@ def render_results(
 
     Args:
         proba: Matriz de probabilidades `(1, 2)` del modelo.
-        air_temp: Temperatura del aire ingresada.
-        process_temp: Temperatura del proceso ingresada.
-        torque: Torque ingresado.
-        rpm: Velocidad de rotación ingresada.
         X_new: Vector de features `(1, 8)` enviado al modelo.
-        umbral_falla: Umbral de decisión de Falla inminente, configurado en la
-            barra lateral por `render_alert_sensitivity`.
+        alerta: Nivel ya resuelto por el controlador: `"Normal"`,
+            `"Precaucion"` o `"Falla inminente"`.
+        potencia: Potencia mecánica en watts, ya calculada.
+        delta_t: Diferencia de temperatura proceso − aire en Kelvin, ya calculada.
     """
     prob_falla = float(proba[0, 1])
-
-    alerta = get_alert_level(prob_falla, umbral_falla)
-    potencia = calculate_power(torque, rpm)
-    delta_t = calculate_delta_t(process_temp, air_temp)
 
     st.subheader("Resultado")
 
@@ -61,7 +53,7 @@ def render_results(
     with st.expander("Detalles de la predicción"):
         st.write("**Vector de entrada (8 features):**")
         st.code(
-            dict(zip(NOMBRE_FEATURES, X_new[0], strict=False)),
+            dict(zip(NOMBRE_FEATURES, X_new[0], strict=True)),
             language="json",
         )
         st.write(

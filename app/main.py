@@ -12,8 +12,8 @@ import streamlit as st
 from app.components.form import render_machine_form
 from app.components.results import render_results
 from app.components.settings import render_alert_sensitivity
+from app.controllers import derivar_vista, ejecutar_prediccion
 from app.utils.model import load_model_and_context
-from app.utils.preprocessing import preprocess_input
 
 st.set_page_config(
     page_title="Mantenimiento Predictivo",
@@ -26,38 +26,22 @@ st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
 
 umbral_falla = render_alert_sensitivity()
 
-model, _, _ = load_model_and_context()
+model = load_model_and_context()
 
 inputs = render_machine_form()
 
 if inputs:
     with st.spinner("Ejecutando inferencia con TabPFN-v2..."):
-        X_new = preprocess_input(
-            inputs["product_type"],
-            inputs["air_temp"],
-            inputs["process_temp"],
-            inputs["rpm"],
-            inputs["torque"],
-            inputs["tool_wear"],
-        )
-        proba = model.predict_proba_con_contexto(X_new)
-
-    st.session_state.resultado = {
-        "proba": proba,
-        "air_temp": inputs["air_temp"],
-        "process_temp": inputs["process_temp"],
-        "torque": inputs["torque"],
-        "rpm": inputs["rpm"],
-        "X_new": X_new,
-    }
+        st.session_state.resultado = ejecutar_prediccion(model, inputs)
 
 if "resultado" in st.session_state:
+    # El umbral se aplica aquí y no al predecir: mover el slider recalcula la
+    # alerta sobre la misma probabilidad, sin repetir la inferencia.
+    vista = derivar_vista(st.session_state.resultado, umbral_falla)
     render_results(
-        proba=st.session_state.resultado["proba"],
-        air_temp=st.session_state.resultado["air_temp"],
-        process_temp=st.session_state.resultado["process_temp"],
-        torque=st.session_state.resultado["torque"],
-        rpm=st.session_state.resultado["rpm"],
-        X_new=st.session_state.resultado["X_new"],
-        umbral_falla=umbral_falla,
+        proba=vista["proba"],
+        X_new=vista["X_new"],
+        alerta=vista["alerta"],
+        potencia=vista["potencia"],
+        delta_t=vista["delta_t"],
     )
