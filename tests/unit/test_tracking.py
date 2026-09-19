@@ -1,5 +1,7 @@
 """Tests unitarios para las funciones auxiliares de tracking en MLflow."""
 
+import pytest
+
 from src.evaluation.tracking import (
     EXTENSION_MODELO,
     LICENCIA_MODELO,
@@ -104,3 +106,45 @@ def test_extENSION_modelo_y_licencia_cubren_ambos_modelos():
         assert modelo in EXTENSION_MODELO
         assert modelo in LICENCIA_MODELO
         assert modelo in REPO_MODELO
+
+
+def test_extension_tabpfn_pasa_la_validacion_de_sufijo_de_la_libreria(tmp_path):
+    # 1. ARRANGE (Estimador falso con `executor_` para simular uno ya ajustado, y una
+    #    ruta que usa la extensión configurada en EXTENSION_MODELO)
+    from tabpfn.model_loading import save_fitted_tabpfn_model
+
+    class _EstimadorFalso:
+        executor_ = None
+
+        def get_params(self, deep: bool = False) -> dict:
+            return {}
+
+    ruta = tmp_path / f"modelo{EXTENSION_MODELO['tabpfn']}"
+
+    # 2. ACT (Guardar con la extensión configurada: el chequeo de sufijo debe pasar y
+    #    la función debe avanzar hasta intentar usar el `executor_` falso)
+    with pytest.raises(AttributeError) as excinfo:
+        save_fitted_tabpfn_model(_EstimadorFalso(), ruta)
+
+    # 3. ASSERT (El error viene de usar el executor falso, no del sufijo: la librería
+    #    nunca llegó a quejarse de la extensión)
+    assert "tabpfn_fit" not in str(excinfo.value)
+
+
+def test_extension_distinta_a_tabpfn_fit_es_rechazada_por_la_libreria(tmp_path):
+    # 1. ARRANGE (Estimador falso "ajustado" y una ruta con la extensión antigua .tabpfn,
+    #    la que tenía EXTENSION_MODELO antes de la corrección)
+    from tabpfn.model_loading import save_fitted_tabpfn_model
+
+    class _EstimadorFalso:
+        executor_ = None
+
+    ruta = tmp_path / "modelo.tabpfn"
+
+    # 2. ACT (Intentar guardar con una extensión que no es .tabpfn_fit)
+    with pytest.raises(ValueError) as excinfo:
+        save_fitted_tabpfn_model(_EstimadorFalso(), ruta)
+
+    # 3. ASSERT (La librería rechaza explícitamente cualquier sufijo que no sea
+    #    .tabpfn_fit, confirmando por qué el save() venía fallando en silencio)
+    assert "tabpfn_fit" in str(excinfo.value)
