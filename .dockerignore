@@ -27,8 +27,6 @@ coverage.xml
 # ---- hornea en la imagen (ver README > "Ejecución con Docker") ----
 data/raw/*
 !data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
 
 # ---- MLflow (solo lo usa scripts/evaluar_modelos.py, no la app) ----
 mlruns/
@@ -47,7 +45,6 @@ mlflow.db
 
 # ---- No necesario en la imagen de producción ----
 tests/
-notebooks/
 EDA/
 docs/
 specs/

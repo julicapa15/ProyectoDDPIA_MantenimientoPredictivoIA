@@ -15,7 +15,10 @@
 FROM python:3.12-slim
 
 # Binario estático de uv, copiado directo desde su imagen oficial (sin pip).
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+# Versión fijada a propósito: `:latest` haría que dos builds del mismo commit
+# pudieran traer gestores distintos, rompiendo la reproducibilidad que el resto
+# del proyecto sí garantiza (uv.lock --frozen, random_state=42, Python 3.12).
+COPY --from=ghcr.io/astral-sh/uv:0.12.3 /uv /uvx /usr/local/bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -34,8 +37,8 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
-# 2) Código del proyecto necesario en tiempo de ejecución (tests/, notebooks/,
-#    EDA/ y los datos crudos quedan fuera vía .dockerignore).
+# 2) Código del proyecto necesario en tiempo de ejecución (tests/, EDA/ y los
+#    datos crudos quedan fuera vía .dockerignore).
 COPY app/ ./app/
 COPY src/ ./src/
 COPY scripts/ ./scripts/
@@ -53,7 +56,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # correcto.
 RUN groupadd --gid 1000 app \
     && useradd --uid 1000 --gid app --home-dir /home/app --create-home app \
-    && mkdir -p /app/data/raw /app/data/processed \
+    && mkdir -p /app/data/raw \
     && chown -R app:app /app /home/app
 ENV HOME=/home/app
 USER app

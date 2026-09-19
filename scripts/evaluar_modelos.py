@@ -12,6 +12,8 @@ from src.models import TabPFNClassifier, XGBoostBaseline
 from src.preprocessing import build_features, load_raw_data
 
 RUTA_DATASET = "data/raw/ai4i2020.csv"
+SPEC_ID_POR_DEFECTO = "001"
+EXPERIMENTO_POR_DEFECTO = "001-tabpfn-xgboost-baseline"
 
 
 def main() -> None:
@@ -27,6 +29,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", default=RUTA_DATASET)
     parser.add_argument("--sin-tabpfn", action="store_true", help="Evalúa solo XGBoost")
+    # spec_id y experimento se pasan explícitamente en cada llamada: si se dejaran
+    # al valor por defecto de log_run_to_mlflow, una evaluación de otra feature
+    # quedaría etiquetada como 001 sin que nadie lo note (Governance).
+    parser.add_argument(
+        "--spec-id",
+        default=SPEC_ID_POR_DEFECTO,
+        help="Feature de spec-kit a la que pertenecen los runs (tag spec_id)",
+    )
+    parser.add_argument(
+        "--experimento",
+        default=EXPERIMENTO_POR_DEFECTO,
+        help="Nombre del experimento de MLflow donde se registran los runs",
+    )
     args = parser.parse_args()
 
     X_train, y_train, X_test, y_test = build_features(load_raw_data(args.dataset))
@@ -41,6 +56,8 @@ def main() -> None:
             "tabpfn",
             y_test,
             proba[:, 1],
+            spec_id=args.spec_id,
+            experiment=args.experimento,
             model=tabpfn,
             dataset_path=args.dataset,
         )
@@ -53,6 +70,8 @@ def main() -> None:
         y_test,
         proba[:, 1],
         params={"scale_pos_weight": round(modelo.scale_pos_weight, 4)},
+        spec_id=args.spec_id,
+        experiment=args.experimento,
         model=modelo,
         dataset_path=args.dataset,
     )

@@ -11,19 +11,17 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.ipynb_checkpoints/
 
 # ---- Cobertura de tests (make coverage) ----
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
-.ipynb_checkpoints/
 
-# ---- Datos pesados (se conservan los .gitkeep) ----
+# ---- Datos pesados (se conserva el .gitkeep) ----
 data/raw/*
 !data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
 
 # ---- MLflow ----
 mlruns/
@@ -44,10 +42,6 @@ mlflow.db
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# ---- Salidas de notebooks ----
-# (los .ipynb se versionan; sus checkpoints y outputs no)
-*.nbconvert.ipynb
 
 # ---- IDE ----
 .vscode/
