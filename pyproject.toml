@@ -15,7 +15,6 @@ dependencies = [
     "mlflow>=3.16.0",
     "numpy>=2.4.6",
     "pandas>=3.0.5",
-    "pytest>=9.1.1",
     "scikit-learn>=1.9.0",
     "streamlit>=1.63.0",
     "tabpfn>=8.5.0",
@@ -51,5 +50,7 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.7",
 ]
