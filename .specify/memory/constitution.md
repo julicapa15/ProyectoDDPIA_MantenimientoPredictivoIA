@@ -20,7 +20,21 @@ El proyecto sigue CRISP-DM (Fase 1: Negocio/Datos, Fase 2: Preparación, Fase 3:
 
 ### V. Tests con Estructura AAA (Arrange, Act, Assert)
 
-Todo test de pytest DEBE escribirse en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)`. Aplica a tests unitarios y de integración, sin excepción.
+Todo test de pytest DEBE escribirse en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)`. Aplica a tests unitarios y de integración.
+
+**Única excepción permitida — tests de excepciones (`pytest.raises`)**: cuando lo que se verifica es que una llamada falle, la ejecución y la verificación ocurren en la misma sentencia `with pytest.raises(...)` y no pueden separarse en dos bloques. En ese caso se usa un único bloque encabezado por el comentario literal `# 2. ACT + 3. ASSERT (...)`:
+
+```python
+def test_archivo_inexistente_lanza_error(tmp_path):
+    # 1. ARRANGE (Ruta a un archivo que no existe)
+    ruta = tmp_path / "no_existe.csv"
+
+    # 2. ACT + 3. ASSERT (Cargar debe fallar con un error explícito)
+    with pytest.raises(FileNotFoundError):
+        load_raw_data(ruta)
+```
+
+Esta excepción NO aplica a ningún otro caso: si el acto y la aserción pueden separarse, deben separarse.
 
 ```python
 def test_ejemplo():
@@ -116,8 +130,9 @@ def predict_proba(self, X_train, y_train, X_test) -> np.ndarray:
 Cada incremento de trabajo se organiza en una **feature de spec-kit** bajo `specs/<NNN>-<nombre>/`:
 
 - `specs/001-tabpfn-xgboost-baseline/` → Módulo 2, Sprint 1: TabPFN-v2 + XGBoost baseline ✅
-- `specs/002-eda-preprocesamiento/` → Módulo 2, Sprint 2: EDA + limpieza (compañero)
-- `specs/003-app-streamlit-docker/` → Módulo 3: interfaz + despliegue
+- `specs/002-eda-preprocesamiento/` → Módulo 2, Sprint 2: EDA (compañero) ✅ — cerrada solo con el EDA; la limpieza no se implementó porque el dataset no tiene nulos y el preprocesamiento ya vive en la spec 001. Trazabilidad completa en la sección "Historial de Alcance" de su `spec.md`. El nombre del directorio se conserva para no romper referencias ni los tags `spec_id` de MLflow.
+- `specs/003-interfaz-streamlit/` → Módulo 3: interfaz web con Streamlit ✅ — antes listada aquí como `003-app-streamlit-docker`. Se implementó solo la interfaz; el despliegue se separó a la feature 004 para no reabrir una spec ya cerrada y mergeada.
+- `specs/004-despliegue-docker/` → Módulo 3: contenedorización y despliegue (puerto 8501)
 
 El baseline GradientBoosting queda **descartado**: XGBoost ya cumple el rol de baseline clásico frente al cual contrastar TabPFN-v2, y añadir un segundo modelo de la misma familia no aportaría evidencia nueva.
 
@@ -153,4 +168,6 @@ MLflow es el registro oficial de runs; cada run DEBE indicar a qué spec-kit fea
 
 ---
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.2.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-18
+
+**Changelog v1.2.1 (PATCH)**: (1) Principio V — se documenta la excepción del bloque `# 2. ACT + 3. ASSERT` para tests con `pytest.raises`, formalizando una práctica ya presente y consistente en 4 tests del repositorio. (2) Desarrollo Dirigido por Especificación — se corrige el nombre de la feature 003 (`003-interfaz-streamlit`, no `003-app-streamlit-docker`), se registra el alcance final de la 002 y se lista la nueva feature `004-despliegue-docker`. Ningún principio cambia de contenido; solo se aclaran y se alinean con la realidad del repositorio.
