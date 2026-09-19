@@ -27,5 +27,5 @@ despliegue Streamlit + Docker (H2, Módulo 3).
 
 **Stack:** Python 3.12 (`pyproject.toml`), uv, scikit-learn/xgboost, Streamlit 1.63, Docker puerto 8501.
 
-**Salida de `app/app.py`:** inputs de las variables de proceso + probabilidad + umbral ajustable +
+**Salida de `app/main.py`:** inputs de las variables de proceso + probabilidad + umbral ajustable +
 semáforo verde/amarillo/rojo interpretable por personal no técnico.
