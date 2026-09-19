@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 
 from src.evaluation.metrics import UMBRAL_POR_DEFECTO, compute_metrics
+from src.preprocessing.features import RANDOM_STATE, TEST_SIZE
+from src.preprocessing.preprocess import COLUMNAS_DUMMY, COLUMNAS_NUMERICAS
 
 EXPERIMENTO_POR_DEFECTO = "001-tabpfn-xgboost-baseline"
 SPEC_ID = "001"
@@ -91,6 +93,7 @@ def log_run_to_mlflow(
     model: object | None = None,
     dataset_path: str | None = None,
     pr_link: str | None = None,
+    tiempo_prediccion_seg: float | None = None,
 ) -> dict[str, float]:
     """Registra un run con sus tags, parámetros, métricas y artefactos.
 
@@ -109,11 +112,21 @@ def log_run_to_mlflow(
         dataset_path: Ruta al CSV usado, para registrar `dataset_version`.
         pr_link: URL del PR o Issue asociado al run. Por defecto toma
             `MLFLOW_PR_LINK`; si ninguna está definida, el tag se omite.
+        tiempo_prediccion_seg: Segundos que tomó la llamada completa a
+            `predict_proba` sobre el conjunto de prueba (para TabPFN incluye
+            el fijado del contexto, ya que no hay `fit` separado). Se usa para
+            derivar latencia por muestra y throughput. Si es `None`, ninguna
+            de las dos métricas se registra.
 
     Returns:
-        Las métricas registradas.
+        Las métricas registradas (incluye `latencia_ms_por_muestra` y
+        `throughput_muestras_seg` solo si se pasó `tiempo_prediccion_seg`).
     """
     metricas = compute_metrics(y_true, y_proba_pos, threshold=threshold)
+    if tiempo_prediccion_seg is not None:
+        n_muestras = len(np.asarray(y_true))
+        metricas["latencia_ms_por_muestra"] = tiempo_prediccion_seg * 1000 / n_muestras
+        metricas["throughput_muestras_seg"] = n_muestras / tiempo_prediccion_seg
 
     mlflow.set_tracking_uri(
         tracking_uri or os.environ.get("MLFLOW_TRACKING_URI") or TRACKING_URI_POR_DEFECTO
@@ -133,6 +146,10 @@ def log_run_to_mlflow(
         params_completos["threshold"] = threshold
         params_completos["model_repo"] = REPO_MODELO.get(model_type, model_type)
         params_completos["device"] = _detectar_device()
+        params_completos["test_size"] = TEST_SIZE
+        params_completos["random_state"] = RANDOM_STATE
+        params_completos["n_features"] = len(COLUMNAS_DUMMY) + len(COLUMNAS_NUMERICAS)
+        params_completos["one_hot_columns"] = ",".join(COLUMNAS_DUMMY)
         version_dataset = _hash_dataset(dataset_path)
         if version_dataset:
             params_completos["dataset_version"] = version_dataset
