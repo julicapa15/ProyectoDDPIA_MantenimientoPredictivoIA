@@ -25,7 +25,9 @@ Nunca usar accuracy como métrica principal (el desbalance la vuelve engañosa).
 **CRISP-DM:** F1 negocio → datos → preparación (H1) → modelado TabPFN + XGBoost → evaluación →
 despliegue Streamlit + Docker (H2, Módulo 3).
 
-**Stack:** Python 3.12 (`pyproject.toml`), uv, scikit-learn/xgboost, Streamlit 1.63, Docker puerto 8501.
+**Stack:** Python 3.12 (`pyproject.toml`), uv, scikit-learn/xgboost, Streamlit 1.63, Docker.
+Dos servicios por gRPC (`proto/mantenimiento.proto`): `inference` (TabPFN-v2, puerto 50051)
+y `web` (Streamlit, cliente gRPC, puerto 8501).
 
 **Salida de `app/main.py`:** inputs de las variables de proceso + probabilidad + umbral ajustable +
 semáforo verde/amarillo/rojo interpretable por personal no técnico.

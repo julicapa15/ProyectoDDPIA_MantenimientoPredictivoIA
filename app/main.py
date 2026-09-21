@@ -12,7 +12,11 @@ import streamlit as st
 from app.components.form import render_machine_form
 from app.components.results import render_results
 from app.components.settings import render_alert_sensitivity
-from app.utils.model import load_model_and_context
+from app.utils.model import (
+    InferenceServiceUnavailableError,
+    check_inference_health,
+    predict_failure,
+)
 from app.utils.preprocessing import preprocess_input
 
 st.set_page_config(
@@ -26,7 +30,10 @@ st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
 
 umbral_falla = render_alert_sensitivity()
 
-model, _, _ = load_model_and_context()
+if check_inference_health():
+    st.caption("🟢 Servicio de inferencia (gRPC) conectado")
+else:
+    st.caption("🔴 Servicio de inferencia (gRPC) no disponible — la predicción fallará")
 
 inputs = render_machine_form()
 
@@ -40,7 +47,11 @@ if inputs:
             inputs["torque"],
             inputs["tool_wear"],
         )
-        proba = model.predict_proba_con_contexto(X_new)
+        try:
+            proba = predict_failure(X_new)
+        except InferenceServiceUnavailableError as exc:
+            st.error(str(exc))
+            st.stop()
 
     st.session_state.resultado = {
         "proba": proba,
