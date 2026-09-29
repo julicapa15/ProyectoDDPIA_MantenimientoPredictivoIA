@@ -1,0 +1,55 @@
+stages:
+  - test
+  - build
+  - deploy
+
+# Todos los trabajos se ejecutan en tu Droplet de DigitalOcean
+default:
+  tags:
+    - droplet
+variables:
+  GIT_DEPTH: 1
+
+
+# ETAPA 1: TEST (Calidad y Pruebas Unitarias)
+test:
+  stage: test
+  before_script:
+    # Instala el gestor uv si no está presente y asegura Python 3.12
+    - command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    - uv python install 3.12
+    - uv sync --frozen
+  script:
+    - export PATH="$HOME/.local/bin:$PATH"
+    # 1. Linter y revisión de calidad con Ruff
+    - uv run ruff check .
+    # 2. Verificación de formato
+    - uv run ruff format --check .
+    # 3. Ejecución de pruebas unitarias con Pytest
+    - uv run pytest tests/unit/ -v
+
+
+# ETAPA 2: BUILD (Construcción de Imágenes Docker)
+build:
+  stage: build
+  script:
+    - docker compose build
+
+
+# ETAPA 3: DEPLOY
+deploy:
+  stage: deploy
+  script:
+    # 1. Asegura que el dataset esté presente
+    - mkdir -p data/raw
+    - '[ -f data/raw/ai4i2020.csv ] || curl -L -o data/raw/ai4i2020.csv "https://archive.ics.uci.edu/ml/machine-learning-databases/00601/ai4i2020.csv"'
+    # 2. Configura el archivo .env con el token de TabPFN
+    - echo "TABPFN_TOKEN=${TABPFN_TOKEN}" > .env
+    # 3. Reinicia los contenedores con la nueva versión
+    - docker compose down
+    - docker compose up -d
+    # 4. Verifica que ambos contenedores estén corriendo
+    - docker compose ps
+  only:
+    - master
