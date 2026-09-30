@@ -20,7 +20,7 @@ from app.utils.model import (
 from app.utils.preprocessing import preprocess_input
 
 st.set_page_config(
-    page_title="Mantenimiento Predictivo",
+    page_title="Mantenimiento Predictivo v1",
     page_icon=":material/engineering:",
     layout="centered",
 )
