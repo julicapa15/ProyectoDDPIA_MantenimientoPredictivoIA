@@ -25,7 +25,7 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("Mantenimiento Predictivo")
+st.title("Mantenimiento Predictivo v1")
 st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
 
 umbral_falla = render_alert_sensitivity()
