@@ -103,3 +103,33 @@ def test_logging_registra_artefactos_y_tags_de_trazabilidad(split_data, xgboost_
     assert run["params.dataset_version"]
     artefactos = {item.path for item in mlflow.MlflowClient().list_artifacts(run["run_id"])}
     assert artefactos == {"ejemplos_prediccion.csv", "reporte_evaluacion.txt", "model"}
+
+
+def test_logging_empaca_el_modelo_tabpfn_como_artefacto(split_data, tmp_path):
+    # 1. ARRANGE (TabPFN con un contexto pequeño, para no repetir la inferencia completa)
+    from tabpfn.errors import TabPFNLicenseError
+
+    from src.models import TabPFNClassifier
+
+    X_train, y_train, X_test, y_test = split_data
+    tracking_uri = f"sqlite:///{tmp_path.as_posix()}/mlflow.db"
+    try:
+        modelo = TabPFNClassifier().fit_context(X_train[:300], y_train[:300])
+    except TabPFNLicenseError:
+        pytest.skip("Licencia de TabPFN no aceptada: ver https://ux.priorlabs.ai/account/licenses")
+    proba_falla = modelo.predict_proba_con_contexto(X_test[:50])[:, 1]
+
+    # 2. ACT (Registrar el run pasando el modelo para que se empaque)
+    log_run_to_mlflow(
+        model_type="tabpfn",
+        y_true=y_test[:50],
+        y_proba_pos=proba_falla,
+        experiment="test-artefacto-tabpfn",
+        tracking_uri=tracking_uri,
+        model=modelo,
+    )
+
+    # 3. ASSERT (El estado de TabPFN quedó subido bajo `model/` en formato nativo)
+    run = mlflow.search_runs(experiment_names=["test-artefacto-tabpfn"]).iloc[0]
+    archivos = [item.path for item in mlflow.MlflowClient().list_artifacts(run["run_id"], "model")]
+    assert archivos == ["model/modelo_tabpfn.tabpfn_fit"]
