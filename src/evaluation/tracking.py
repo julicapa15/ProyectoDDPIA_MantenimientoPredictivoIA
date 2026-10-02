@@ -41,8 +41,10 @@ LICENCIA_MODELO = {
 }
 
 # Cada modelo se empaca con su propio `save()`, en formato nativo (FR-007).
+# TabPFN exige el sufijo `.tabpfn_fit` en `save_fit_state` (lanza ValueError con
+# cualquier otro), así que no es una elección libre.
 EXTENSION_MODELO = {
-    "tabpfn": ".tabpfn",
+    "tabpfn": ".tabpfn_fit",
     "xgboost": ".json",
 }
 

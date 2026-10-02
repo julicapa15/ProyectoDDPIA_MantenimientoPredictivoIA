@@ -19,9 +19,21 @@ from proto import mantenimiento_pb2, mantenimiento_pb2_grpc
 
 INFERENCE_SERVICE_ADDR = os.environ.get("INFERENCE_SERVICE_ADDR", "localhost:50051")
 TIMEOUT_SEGUNDOS = 90.0
+# `check_inference_health` corre en cada rerun de Streamlit (cada widget que se
+# toca), así que no puede heredar los 90 s de la predicción: si la red no falla
+# rápido, la página entera quedaría congelada esperando el banner de estado.
+TIMEOUT_HEALTH_SEGUNDOS = 3.0
+
+# Códigos gRPC que significan "el servicio no está disponible" (caído,
+# inalcanzable o demasiado lento), a diferencia de un rechazo de la petición.
+CODIGOS_NO_DISPONIBLE = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED}
 
 
-class InferenceServiceUnavailableError(RuntimeError):
+class InferenceServiceError(RuntimeError):
+    """Se lanza cuando el servicio de inferencia gRPC no pudo devolver una predicción."""
+
+
+class InferenceServiceUnavailableError(InferenceServiceError):
     """Se lanza cuando el servicio de inferencia gRPC no responde."""
 
 
@@ -54,7 +66,7 @@ def check_inference_health() -> bool:
     try:
         stub = get_inference_stub(INFERENCE_SERVICE_ADDR)
         response = stub.HealthCheck(
-            mantenimiento_pb2.HealthCheckRequest(), timeout=TIMEOUT_SEGUNDOS
+            mantenimiento_pb2.HealthCheckRequest(), timeout=TIMEOUT_HEALTH_SEGUNDOS
         )
         return bool(response.ready)
     except grpc.RpcError:
@@ -76,6 +88,9 @@ def predict_failure(X_new: np.ndarray) -> np.ndarray:
     Raises:
         InferenceServiceUnavailableError: Si el servicio no responde (caído,
             inalcanzable o supera el timeout).
+        InferenceServiceError: Si el servicio respondió pero rechazó o no pudo
+            procesar la petición (p. ej. `INVALID_ARGUMENT` por un vector mal
+            formado).
     """
     stub = get_inference_stub(INFERENCE_SERVICE_ADDR)
     request = mantenimiento_pb2.PredictionRequest(features=list(X_new[0]))
@@ -83,7 +98,12 @@ def predict_failure(X_new: np.ndarray) -> np.ndarray:
         response = stub.PredictFailure(request, timeout=TIMEOUT_SEGUNDOS)
     except grpc.RpcError as exc:
         detail = exc.details() if hasattr(exc, "details") else str(exc)
-        raise InferenceServiceUnavailableError(
-            f"El servicio de inferencia ({INFERENCE_SERVICE_ADDR}) no respondió: {detail}"
+        code = exc.code() if hasattr(exc, "code") else None
+        if code in CODIGOS_NO_DISPONIBLE:
+            raise InferenceServiceUnavailableError(
+                f"El servicio de inferencia ({INFERENCE_SERVICE_ADDR}) no respondió: {detail}"
+            ) from exc
+        raise InferenceServiceError(
+            f"El servicio de inferencia rechazó la petición ({code}): {detail}"
         ) from exc
     return np.array([[response.proba_no_failure, response.proba_failure]])

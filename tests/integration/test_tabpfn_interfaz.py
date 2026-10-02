@@ -2,6 +2,10 @@
 
 Usan una muestra sintética pequeña: TabPFN en CPU es costoso y aquí solo se
 verifica el contrato de la interfaz, no la calidad de las predicciones.
+
+Están en integración, no en unit, porque aun con 60 filas cargar TabPFN-v2 llega
+a ~1 GB de RAM: el job `test` del CI solo corre tests/unit/ en un droplet de
+2 GB que comparte memoria con la app de producción.
 """
 
 import numpy as np

@@ -1,6 +1,6 @@
 """Prueba end-to-end de la comunicación gRPC entre `web` e `inference`.
 
-A diferencia de tests/unit/test_serving.py (llama al servicer directo, sin
+A diferencia de test_serving_e2e.py (llama al servicer directo, sin
 red), aquí se levanta un servidor gRPC real en un socket local y se le habla
 con el mismo stub que usa app/utils/model.py, para probar la serialización
 protobuf y el transporte de red de punta a punta.
@@ -60,7 +60,22 @@ def test_canal_a_un_puerto_sin_servidor_lanza_rpc_error():
     with grpc.insecure_channel("localhost:1") as channel:
         stub = mantenimiento_pb2_grpc.InferenceServiceStub(channel)
 
-        # 2. ACT / 3. ASSERT (app/utils/model.py traduce esto a
+        # 2. ACT + 3. ASSERT (app/utils/model.py traduce esto a
         # InferenceServiceUnavailableError; aquí se verifica el error de base)
         with pytest.raises(grpc.RpcError):
             stub.HealthCheck(mantenimiento_pb2.HealthCheckRequest(), timeout=3)
+
+
+def test_vector_con_largo_incorrecto_se_rechaza_con_invalid_argument(grpc_server_address):
+    # 1. ARRANGE (solo 3 features en vez de 8)
+    request = mantenimiento_pb2.PredictionRequest(features=[1.0, 2.0, 3.0])
+
+    # 2. ACT (llamar al servidor real y capturar el error de transporte)
+    with grpc.insecure_channel(grpc_server_address) as channel:
+        stub = mantenimiento_pb2_grpc.InferenceServiceStub(channel)
+        with pytest.raises(grpc.RpcError) as excinfo:
+            stub.PredictFailure(request, timeout=30)
+
+    # 3. ASSERT (código explícito de entrada inválida, no un UNKNOWN de TabPFN)
+    assert excinfo.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    assert "8 features" in excinfo.value.details()

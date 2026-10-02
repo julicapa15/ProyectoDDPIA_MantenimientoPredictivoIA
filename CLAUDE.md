@@ -37,6 +37,7 @@ uv run python EDA/eda.py                  # regenerate EDA tables/figures
 uv run python -m grpc_tools.protoc -I proto --python_out=proto \
   --grpc_python_out=proto --pyi_out=proto proto/mantenimiento.proto  # regen gRPC stubs (or: make proto)
 docker compose up --build                 # run both services in containers (or: make compose-up)
+docker compose -f docker-compose.local.yml up --build  # same on Docker Desktop (or: make compose-up-local)
 ```
 
 A `Makefile` wraps most of these (`make help` lists all targets, e.g. `make test`,
@@ -130,9 +131,13 @@ pinned to a single source of truth.
   to be up yet), `predict_failure(X_new)` calls `PredictFailure` and re-shapes the response
   back into the `(1, 2)` array `app/components/results.py` expects, and
   `check_inference_health()` backs the connectivity banner shown on the page. A
-  `grpc.RpcError` from either call is translated to `InferenceServiceUnavailableError` (a
-  domain exception `main.py` catches to show a friendly `st.error`, instead of leaking gRPC
-  specifics into the presentation layer). `app/utils/preprocessing.py` rebuilds the one-hot
+  `grpc.RpcError` from `predict_failure` is translated to a domain exception —
+  `InferenceServiceUnavailableError` for `UNAVAILABLE`/`DEADLINE_EXCEEDED`, its base
+  `InferenceServiceError` for anything else (e.g. the server's `INVALID_ARGUMENT` when the
+  vector isn't 8 finite values) — which `main.py` catches as `InferenceServiceError` to show
+  a friendly `st.error`, instead of leaking gRPC specifics into the presentation layer.
+  `check_inference_health` runs on every Streamlit rerun, so it uses its own short
+  `TIMEOUT_HEALTH_SEGUNDOS`, not the 90 s prediction timeout. `app/utils/preprocessing.py` rebuilds the one-hot
   + feature vector for a single form submission by hand (no pandas dependency, just numpy),
   but imports `NOMBRE_FEATURES` from `src.preprocessing.preprocess`'s constants instead of
   hardcoding the column order — see Architecture intro above for the drift test that guards
@@ -163,3 +168,11 @@ pinned to a single source of truth.
   `tipo: descripción breve` (`feat`, `fix`, `chore`, `docs`, `test`, `refactor`).
 - Full rules used for AI-assisted code review live in `AGENTS.md`; the constitution at
   `.specify/memory/constitution.md` is the source of truth if the two ever disagree.
+
+## MCP
+
+`.mcp.json` (repo root — the file Claude Code reads for project-scoped servers;
+`.claude/mcp.json` is *not* read) shares the official GitLab MCP server
+(`https://gitlab.com/api/v4/mcp`, OAuth per user, no secrets in the repo) with the whole
+team. Personal servers with machine-specific paths go in local/user scope
+(`claude mcp add --scope local ...`), never in `.mcp.json`.

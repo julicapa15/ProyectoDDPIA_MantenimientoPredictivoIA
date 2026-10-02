@@ -69,6 +69,7 @@ help: ## Muestra este menú de ayuda
 	@echo    docker-build       Construye un stage suelto (DOCKER_TARGET=web^|inference)
 	@echo    docker-run         Ejecuta ese stage suelto en un contenedor
 	@echo    compose-up         Levanta web + inference juntos con docker compose
+	@echo    compose-up-local   Igual, pero con red bridge (Docker Desktop Windows/macOS)
 	@echo    compose-down       Detiene los servicios de docker compose
 	@echo.
 	@echo  Utilidades:
@@ -169,6 +170,10 @@ docker-run: ## Ejecuta ese stage suelto (monta ./data y reenvia TABPFN_TOKEN; so
 .PHONY: compose-up
 compose-up: ## Levanta web + inference juntos con docker compose (comunicados por gRPC)
 	docker compose up --build
+
+.PHONY: compose-up-local
+compose-up-local: ## Levanta web + inference en Docker Desktop (red bridge, ver docker-compose.local.yml)
+	docker compose -f docker-compose.local.yml up --build
 
 .PHONY: compose-down
 compose-down: ## Detiene y elimina los contenedores de docker compose
