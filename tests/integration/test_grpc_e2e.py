@@ -1,6 +1,6 @@
 """Prueba end-to-end de la comunicación gRPC entre `web` e `inference`.
 
-A diferencia de tests/unit/test_serving.py (llama al servicer directo, sin
+A diferencia de test_serving_e2e.py (llama al servicer directo, sin
 red), aquí se levanta un servidor gRPC real en un socket local y se le habla
 con el mismo stub que usa app/utils/model.py, para probar la serialización
 protobuf y el transporte de red de punta a punta.
