@@ -1,0 +1,39 @@
+# Variante de docker-compose.yml para desarrollo local en Docker Desktop
+# (Windows/macOS).
+#
+# docker-compose.yml usa `network_mode: host`, que es lo que corre en el droplet
+# de producción (ver .gitlab-ci.yml, job `deploy`). En Docker Desktop esa red
+# no expone los puertos al equipo por defecto, así que `localhost:8501` no
+# responde. Este archivo usa la red bridge de compose: los servicios se
+# encuentran por nombre (`inference:50051`) y se publican los puertos.
+#
+# Uso: `docker compose -f docker-compose.local.yml up --build`
+# (o: make compose-up-local). Mismos requisitos que docker-compose.yml:
+# dataset en ./data/raw/ai4i2020.csv y TABPFN_TOKEN en .env.
+
+services:
+  inference:
+    build:
+      context: .
+      target: inference
+    environment:
+      - GRPC_PORT=50051
+      - TABPFN_TOKEN=${TABPFN_TOKEN:-}
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "50051:50051"
+
+  web:
+    build:
+      context: .
+      target: web
+    environment:
+      - INFERENCE_SERVICE_ADDR=inference:50051
+    ports:
+      - "8501:8501"
+    depends_on:
+      # Espera al HEALTHCHECK de la imagen `inference` (llama a su propio
+      # HealthCheck gRPC), no solo a que el contenedor arranque.
+      inference:
+        condition: service_healthy
