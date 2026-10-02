@@ -13,7 +13,7 @@ from app.components.form import render_machine_form
 from app.components.results import render_results
 from app.components.settings import render_alert_sensitivity
 from app.utils.model import (
-    InferenceServiceUnavailableError,
+    InferenceServiceError,
     check_inference_health,
     predict_failure,
 )
@@ -49,7 +49,7 @@ if inputs:
         )
         try:
             proba = predict_failure(X_new)
-        except InferenceServiceUnavailableError as exc:
+        except InferenceServiceError as exc:
             st.error(str(exc))
             st.stop()
 

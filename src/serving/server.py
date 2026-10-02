@@ -17,12 +17,14 @@ import grpc
 import numpy as np
 
 from proto import mantenimiento_pb2, mantenimiento_pb2_grpc
+from src.preprocessing.preprocess import COLUMNAS_DUMMY, COLUMNAS_NUMERICAS
 from src.serving.model_loader import load_model_and_context
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = "50051"
 MAX_WORKERS = 4
+N_FEATURES = len(COLUMNAS_DUMMY) + len(COLUMNAS_NUMERICAS)
 
 
 class InferenceServicer(mantenimiento_pb2_grpc.InferenceServiceServicer):
@@ -43,13 +45,28 @@ class InferenceServicer(mantenimiento_pb2_grpc.InferenceServiceServicer):
 
         Args:
             request: Vector `features` (longitud 8) ya preprocesado por el cliente.
-            context: Contexto gRPC de la llamada (no usado).
+            context: Contexto gRPC de la llamada; se usa para rechazar entradas
+                inválidas con `INVALID_ARGUMENT`.
 
         Returns:
             Probabilidades de no-falla y falla, en `[0, 1]`.
+
+        Raises:
+            grpc.RpcError: Vía `context.abort(INVALID_ARGUMENT, ...)` si el vector
+                no tiene `N_FEATURES` valores o alguno no es finito. Sin esta
+                validación, TabPFN fallaría con un error interno (`UNKNOWN`).
         """
-        del context  # No usado: sin metadata ni cancelación en esta versión.
         X_new = np.array([request.features], dtype=float)
+        if X_new.shape[1] != N_FEATURES:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                f"Se esperaban {N_FEATURES} features, se recibieron {X_new.shape[1]}",
+            )
+        if not np.isfinite(X_new).all():
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Las features deben ser números finitos (sin NaN ni infinito)",
+            )
         proba = self._model.predict_proba_con_contexto(X_new)
         return mantenimiento_pb2.PredictionResponse(
             proba_no_failure=float(proba[0, 0]),
