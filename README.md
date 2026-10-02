@@ -142,6 +142,11 @@ cp .env.example .env
 docker compose up --build     # o: make compose-up
 ```
 
+> **Docker Desktop (Windows/macOS):** `docker-compose.yml` usa `network_mode: host`,
+> pensado para el servidor Linux de despliegue, y en Docker Desktop no publica los puertos.
+> En local usa `docker compose -f docker-compose.local.yml up --build`
+> (o `make compose-up-local`), que usa la red bridge y espera a que `inference` esté sano.
+
 La interfaz queda disponible en `http://localhost:8501`; el servicio de inferencia,
 en `localhost:50051`. Sin `TABPFN_TOKEN` (o sin licencia aceptada en
 [ux.priorlabs.ai](https://ux.priorlabs.ai)), la carga del modelo en `inference` falla
@@ -152,6 +157,29 @@ También puede construirse/ejecutarse un servicio suelto con `make docker-build`
 `make docker-run` (usan el stage `web` por defecto; `make DOCKER_TARGET=inference
 docker-build` para el otro) — útil para depurar una imagen a la vez, pero solo
 `docker compose` conecta ambos servicios entre sí.
+
+---
+
+## MCP para el equipo (Claude Code)
+
+El archivo [`.mcp.json`](.mcp.json) de la raíz configura para todo el equipo el
+[servidor MCP oficial de GitLab](https://docs.gitlab.com/user/model_context_protocol/mcp_server/)
+(`https://gitlab.com/api/v4/mcp`). Con él, Claude Code puede consultar y operar este
+proyecto en GitLab: issues/work items, merge requests (diffs, comentarios, revisión),
+ramas, commits y, sobre todo, **pipelines y jobs de CI/CD** (ver el log de un job fallido
+del runner del droplet sin salir del editor).
+
+- **No guarda secretos:** usa OAuth, así que cada integrante se autentica con su propia
+  cuenta de GitLab y solo ve lo que su rol le permite.
+- **Primer uso:** al abrir Claude Code en el repo, aprobar el servidor `GitLab` del
+  proyecto; luego ejecutar `/mcp`, elegir `GitLab` y completar la autorización en el
+  navegador.
+- **Requisito:** el servidor está en beta y debe estar habilitado ("Allow access to the
+  MCP server") a nivel de grupo/instancia en GitLab.
+
+Los servidores MCP personales (p. ej. `engram`, con rutas propias de cada equipo) **no**
+van en `.mcp.json`: se agregan solo para uno mismo con
+`claude mcp add --scope local <nombre> -- <comando>`.
 
 ---
 
