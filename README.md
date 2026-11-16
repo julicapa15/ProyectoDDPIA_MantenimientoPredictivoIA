@@ -19,6 +19,22 @@
 
 </div>
 
+> **English summary**
+>
+> End-to-end predictive maintenance system that estimates the probability of failure of an industrial machine from its operating variables, such as torque, rotational speed, air and process temperature and tool wear. Since failures account for only 3.4% of the AI4I 2020 dataset, models are compared on the failure class, where the pretrained TabPFN-v2 transformer outperformed an XGBoost baseline on every metric: F1 0.825 versus 0.729, recall 0.765 versus 0.750 and PR-AUC 0.880 versus 0.837.
+>
+> The system runs as two Docker services connected through gRPC, an inference server and a Streamlit interface built on the MVC pattern, and it is backed by MLflow experiment tracking, 169 automated tests and a GitLab CI/CD pipeline that tests, builds and deploys to a cloud server.
+>
+> **My role:** As project lead of a four-person team, I defined the modeling approach and divided the work into pull requests that I reviewed and merged, while also contributing fixes to the gRPC client, the split between unit and integration tests for the CI runner and the team's MCP configuration.
+>
+> *The full documentation below is in Spanish.*
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/ae9fadce-1638-4324-b1c8-b60d12a6464b" alt="Streamlit interface with the gRPC inference service connected" width="49%">
+  <img src="https://github.com/user-attachments/assets/ae040c03-4342-4dc8-85c5-a25b44423cd0" alt="Prediction result showing an imminent failure alert" width="49%">
+</p>
+
+
 ---
 
 ## Tabla de contenidos
@@ -195,8 +211,8 @@ flowchart LR
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/julicapa15/ProyectoDDPIA_MantenimientoPredictivoIA.git
-cd ProyectoDDPIA_MantenimientoPredictivoIA
+git clone https://github.com/julicapa15/predictive-maintenance-tabpfn.git
+cd predictive-maintenance-tabpfn
 
 # 2. Crear el entorno e instalar dependencias exactas desde uv.lock
 uv sync
