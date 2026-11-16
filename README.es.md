@@ -1,0 +1,469 @@
+<div align="center">
+
+# Mantenimiento Predictivo con TabPFN-v2
+
+**Estimación de la probabilidad de falla en maquinaria industrial a partir de sus variables operativas**
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/uv-0.12.3-DE5FE9?logo=astral&logoColor=white)](https://docs.astral.sh/uv/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.63-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Docker](https://img.shields.io/badge/Docker-python%3A3.12--slim-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![MLflow](https://img.shields.io/badge/MLflow-3.16-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![gRPC](https://img.shields.io/badge/gRPC-1.84-244C5A?logo=grpc&logoColor=white)](https://grpc.io/)
+[![GitLab CI/CD](https://img.shields.io/badge/CI%2FCD-GitLab-FC6D26?logo=gitlab&logoColor=white)](https://gitlab.com/dfgarces13/ProyectoDDPIA_MantenimientoPredictivoIA/-/pipelines)
+
+[![Tests](https://img.shields.io/badge/tests-169-3FB950?logo=pytest&logoColor=white)](#pruebas-y-calidad)
+[![Ruff](https://img.shields.io/badge/lint-Ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
+[![Constitución](https://img.shields.io/badge/constituci%C3%B3n-v1.2.2-8957E5)](.specify/memory/constitution.md)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+
+*[Read in English](README.md)*
+
+</div>
+
+> **English summary**
+>
+> End-to-end predictive maintenance system that estimates the probability of failure of an industrial machine from its operating variables, such as torque, rotational speed, air and process temperature and tool wear. Since failures account for only 3.4% of the AI4I 2020 dataset, models are compared on the failure class, where the pretrained TabPFN-v2 transformer outperformed an XGBoost baseline on every metric: F1 0.825 versus 0.729, recall 0.765 versus 0.750 and PR-AUC 0.880 versus 0.837.
+>
+> The system runs as two Docker services connected through gRPC, an inference server and a Streamlit interface built on the MVC pattern, and it is backed by MLflow experiment tracking, 169 automated tests and a GitLab CI/CD pipeline that tests, builds and deploys to a cloud server.
+>
+> **My role:** As project lead of a four-person team, I defined the modeling approach and divided the work into pull requests that I reviewed and merged, while also contributing fixes to the gRPC client, the split between unit and integration tests for the CI runner and the team's MCP configuration.
+
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/ae9fadce-1638-4324-b1c8-b60d12a6464b" alt="Streamlit interface with the gRPC inference service connected" width="49%">
+  <img src="https://github.com/user-attachments/assets/ae040c03-4342-4dc8-85c5-a25b44423cd0" alt="Prediction result showing an imminent failure alert" width="49%">
+</p>
+
+
+---
+
+## Tabla de contenidos
+
+- [Contexto](#contexto)
+- [Arquitectura](#arquitectura)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Stack técnico](#stack-técnico)
+- [Instalación](#instalación)
+- [Uso](#uso)
+- [Ejecución con Docker](#ejecución-con-docker)
+- [Pruebas y calidad](#pruebas-y-calidad)
+- [CI/CD y despliegue](#cicd-y-despliegue)
+- [Resultados](#resultados)
+- [Análisis exploratorio](#análisis-exploratorio-eda)
+- [Desarrollo dirigido por especificación](#desarrollo-dirigido-por-especificación)
+- [Estado del proyecto](#estado-del-proyecto)
+- [Equipo](#equipo)
+- [Licencia](#licencia)
+
+---
+
+## Contexto
+
+### El problema
+
+En una planta industrial, una parada no programada cuesta mucho más que un mantenimiento preventivo. El reto es anticipar la falla: decidir, a partir de las lecturas actuales de una máquina, si conviene intervenir **antes** de que se detenga.
+
+Este proyecto resuelve esa decisión como un problema de **clasificación binaria**. A partir de seis variables —tipo de producto, temperatura del aire, temperatura del proceso, velocidad de rotación, torque y desgaste de herramienta— el sistema devuelve la probabilidad de falla y la traduce en un semáforo operativo de tres niveles.
+
+### Los datos
+
+Se usa el dataset [AI4I 2020 Predictive Maintenance](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) (UCI, CC BY 4.0): 10.000 registros, 14 columnas, sin valores faltantes.
+
+El hecho determinante es su **desbalance severo: solo 339 registros (3,39%) corresponden a fallas**. Eso condiciona todo lo demás, empezando por la elección de métricas: un modelo que nunca alertara acertaría el 96,6% de las veces siendo completamente inútil.
+
+### El enfoque
+
+El modelo base es **TabPFN-v2**, un transformer preentrenado para datos tabulares que predice *en contexto*: recibe el conjunto de referencia como parte de la llamada y devuelve probabilidades, **sin entrenamiento por gradiente ni búsqueda de hiperparámetros**. Como referencia clásica se contrasta contra un **XGBoost** entrenado desde cero, compensando el desbalance con `scale_pos_weight`.
+
+La solución se divide en dos servicios que se comunican por **gRPC**: `inference` carga TabPFN-v2 y expone la predicción por la red, y `web` es una interfaz **Streamlit** organizada según el patrón MVC que actúa como cliente ligero de ese servicio. Ambos se empaquetan con **Docker Compose** y se despliegan con un pipeline de **GitLab CI/CD** en un servidor de DigitalOcean.
+
+---
+
+## Arquitectura
+
+> 📐 **[Diagrama interactivo →](docs/arquitectura.html)** de la versión monolítica previa a gRPC, explorable y con exportación a PNG/SVG. Descárgalo y ábrelo en el navegador; GitHub no renderiza HTML en línea.
+
+```mermaid
+flowchart LR
+    operador(["Operador<br/>navegador :8501"])
+
+    subgraph web["Servicio web · Streamlit (MVC)"]
+        direction LR
+        vista["<b>Vista</b><br/>app/components/<br/><i>solo dibuja</i>"]
+        ctrl["<b>Controlador</b><br/>app/controllers/<br/><i>sin Streamlit</i>"]
+        cliente["<b>Cliente gRPC</b><br/>app/utils/model.py<br/><i>vector de 8 features</i>"]
+    end
+
+    subgraph inference["Servicio inference · gRPC :50051"]
+        direction LR
+        server["<b>InferenceService</b><br/>src/serving/<br/><i>PredictFailure · HealthCheck</i>"]
+        tabpfn["<b>TabPFN-v2</b><br/><i>contexto de 1.000 muestras</i>"]
+    end
+
+    subgraph src["src/ · Núcleo agnóstico del framework"]
+        direction LR
+        preproc["<b>Preprocesamiento</b><br/>carga · one-hot · split 80/20"]
+        xgb["<b>XGBoost</b><br/><i>baseline</i>"]
+        evalm["<b>Evaluación</b><br/>F1 · Recall · PR-AUC"]
+    end
+
+    dataset[("AI4I 2020<br/>data/raw/")]
+    mlflowdb[("MLflow<br/>mlflow.db")]
+    cli["CLI de evaluación<br/>scripts/"]
+
+    operador --> vista
+    vista -->|"6 variables"| ctrl
+    ctrl --> cliente
+    cliente ==>|"protobuf · proto/mantenimiento.proto"| server
+    ctrl -.->|"alerta · potencia · ΔT"| vista
+    server --> tabpfn
+    preproc --> tabpfn
+    preproc -.-> xgb
+    preproc --> dataset
+    cli --> preproc
+    tabpfn --> evalm
+    xgb -.-> evalm
+    evalm --> mlflowdb
+```
+
+### Cómo se reparten las responsabilidades
+
+| Capa | Ubicación | Responsabilidad |
+|---|---|---|
+| **Vista** | `app/components/` | Solo dibuja. Recibe valores ya resueltos; no invoca funciones de dominio ni calcula nada. |
+| **Controlador** | `app/controllers/` | Coordina: formulario → vector → inferencia → valores para la vista. No importa Streamlit, y por eso se prueba sin levantar la interfaz. |
+| **Modelo (app)** | `app/utils/` | Dominio de la interfaz: física, umbrales de alerta, construcción del vector y cliente gRPC del servicio de inferencia. |
+| **Servicio de inferencia** | `src/serving/` | Carga TabPFN-v2 una sola vez y expone `PredictFailure` y `HealthCheck` por gRPC. Valida la entrada y responde `INVALID_ARGUMENT` ante un vector mal formado. |
+| **Contrato** | `proto/` | Definición protobuf compartida por cliente y servidor, con sus stubs generados (`make proto`). |
+| **Modelo (núcleo)** | `src/` | Carga y validación del dataset, preprocesamiento, modelos y evaluación. No sabe que existe Streamlit. |
+
+### Decisiones que sostienen el diseño
+
+- **Una sola fuente de verdad para el orden de las features.** `app/utils/preprocessing.NOMBRE_FEATURES` se deriva de `src.preprocessing.preprocess` en vez de repetir la lista. Un test procesa una misma fila por ambos caminos y falla si divergen.
+- **El umbral de alerta se aplica al renderizar, no al predecir.** Mover el slider recalcula el semáforo sobre la misma probabilidad, sin repetir una inferencia que toma 1-2 s en CPU.
+- **El contrato entre capas está testeado.** Un test compara con `inspect.signature` las claves que produce el controlador contra los parámetros que declara la vista.
+- **El modelo pesado vive fuera de la interfaz.** Streamlit no importa torch ni tabpfn: solo abre un canal gRPC. La interfaz arranca en segundos, muestra si el servicio está conectado y, si no lo está, falla con un mensaje explícito en vez de colgarse.
+- **El controlador recibe la inferencia inyectada.** En la app es el cliente gRPC y en las pruebas un doble, por eso la coordinación se prueba sin red ni modelo.
+- **TabPFN no se entrena.** Se usa `fit_context()`, que solo registra el conjunto de referencia. La interfaz fija 1.000 muestras estratificadas para mantener la latencia baja.
+
+---
+
+## Estructura del proyecto
+
+```text
+.
+├── app/                      # Interfaz Streamlit (patrón MVC)
+│   ├── components/           #   Vista: formulario, resultados, ajustes
+│   ├── controllers/          #   Controlador: coordinación de la predicción
+│   ├── utils/                #   Modelo de la app: física, preprocesamiento, cliente gRPC
+│   └── main.py               #   Entrypoint de Streamlit
+├── src/                      # Núcleo agnóstico del framework
+│   ├── preprocessing/        #   Carga, one-hot de Type, split estratificado
+│   ├── models/               #   TabPFN-v2 y baseline XGBoost
+│   ├── serving/              #   Servicio gRPC de inferencia
+│   └── evaluation/           #   Métricas de la clase falla y tracking MLflow
+├── proto/                    # Contrato gRPC (.proto) y stubs generados
+├── tests/
+│   ├── unit/                 #   Pruebas unitarias
+│   └── integration/          #   Pruebas de extremo a extremo
+├── EDA/                      # Análisis exploratorio: script, tablas, figuras, informe
+├── scripts/                  # Entrypoints ejecutables
+├── specs/                    # Especificaciones spec-kit por incremento
+├── docs/                     # Diagrama de arquitectura interactivo
+├── data/raw/                 # Dataset AI4I 2020 (no versionado)
+├── .specify/memory/          # Constitución del proyecto
+├── Dockerfile                # Multi-stage: imágenes `web` e `inference`
+├── docker-compose.yml        # Orquesta los dos servicios en el servidor Linux
+├── docker-compose.local.yml  # Variante para Docker Desktop (red bridge)
+├── .gitlab-ci.yml            # Pipeline test → build → deploy
+├── Makefile                  # Atajos de desarrollo (`make help`)
+├── LICENSE                   # MIT, más los términos de terceros
+└── pyproject.toml            # Dependencias y configuración de Ruff/pytest
+```
+
+---
+
+## Stack técnico
+
+| Componente | Herramienta |
+|---|---|
+| Modelo base | TabPFN-v2 (`tabpfn>=8.5.0`) |
+| Baseline clásico | XGBoost (`xgboost>=3.2.0`) |
+| Dataset | AI4I 2020 Predictive Maintenance (UCI) |
+| Procesamiento | pandas · NumPy · scikit-learn |
+| Visualización | matplotlib |
+| Interfaz | Streamlit |
+| Comunicación entre servicios | gRPC · Protocol Buffers |
+| Contenedor | Docker multi-stage (`python:3.12-slim` + uv 0.12.3) · Docker Compose |
+| CI/CD | GitLab CI/CD con runner propio en DigitalOcean |
+| Gestión de entorno | uv |
+| Pruebas | pytest · pytest-cov |
+| Calidad | Ruff (lint + formato) · pre-commit |
+| Seguimiento de experimentos | MLflow (backend SQLite) |
+
+> **Sobre los baselines.** GradientBoosting quedó descartado: XGBoost ya cumple el rol de referencia clásica, y añadir un segundo modelo de la misma familia no aportaría evidencia nueva.
+
+---
+
+## Instalación
+
+**Requisitos:** [uv](https://docs.astral.sh/uv/) y Python 3.12.
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/julicapa15/predictive-maintenance-tabpfn.git
+cd predictive-maintenance-tabpfn
+
+# 2. Crear el entorno e instalar dependencias exactas desde uv.lock
+uv sync
+```
+
+No hace falta activar el entorno: todos los comandos van prefijados con `uv run`.
+
+Para añadir dependencias, usa siempre `uv add <paquete>` (o `uv add --dev <paquete>`), nunca `pip install`.
+
+### Dataset
+
+El CSV no se versiona. Descarga [AI4I 2020](https://archive.ics.uci.edu/dataset/601/ai4i+2020+predictive+maintenance+dataset) y colócalo en:
+
+```text
+data/raw/ai4i2020.csv
+```
+
+La carga valida que tenga exactamente 10.000 filas, las 14 columnas originales y ningún nulo. Si algo no cuadra, falla con un mensaje explícito en lugar de seguir adelante con datos dudosos.
+
+### Licencia de TabPFN-v2
+
+TabPFN descarga sus pesos tras una aceptación de licencia única en [ux.priorlabs.ai](https://ux.priorlabs.ai). Sin ella, sus pruebas se omiten automáticamente en lugar de fallar.
+
+> **En Windows** el flujo interactivo falla con `OSError: [WinError 10038]`: la librería usa `select()` sobre `stdin`, que en Windows solo admite sockets. Genera una API key en [ux.priorlabs.ai/account](https://ux.priorlabs.ai/account) y expórtala antes de ejecutar:
+>
+> ```powershell
+> $env:TABPFN_TOKEN = "tu_api_key"
+> ```
+
+### Si el repositorio vive en OneDrive
+
+OneDrive no soporta enlaces duros y `uv` puede fallar con `os error 396`. Se resuelve una sola vez:
+
+```powershell
+setx UV_LINK_MODE copy
+```
+
+---
+
+## Uso
+
+### Interfaz web
+
+La app son dos procesos que se hablan por gRPC. En dos terminales:
+
+```bash
+uv run python -m src.serving.server     # terminal 1, servicio de inferencia (o: make grpc-server)
+uv run streamlit run app/main.py        # terminal 2, interfaz web (o: make app)
+```
+
+Disponible en `http://localhost:8501`. Ingresa las seis variables, presiona **Predecir falla** y obtienes:
+
+- un **semáforo** de tres niveles (Normal / Precaución / Falla inminente),
+- la **probabilidad** de falla,
+- la **potencia mecánica** y el **ΔT** derivados de las lecturas,
+- el vector de 8 features que realmente recibió el modelo.
+
+El slider lateral ajusta la sensibilidad de la alerta entre 35% y 90%: más sensible detecta fallas con menor probabilidad a costa de más falsas alarmas.
+
+### Evaluación de modelos
+
+```bash
+uv run python -m scripts.evaluar_modelos                 # o: make evaluar
+uv run python -m scripts.evaluar_modelos --sin-tabpfn    # solo el baseline
+```
+
+Corre el pipeline completo, imprime la comparativa y registra ambos runs en MLflow. Acepta `--spec-id` y `--experimento` para asociar los runs a la feature correcta.
+
+### Interfaz de MLflow
+
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000   # o: make mlflow
+```
+
+### Análisis exploratorio
+
+```bash
+uv run python EDA/eda.py
+```
+
+Genera cuatro tablas en `EDA/` y cinco figuras en `EDA/figures/`.
+
+### Atajos disponibles
+
+`make help` los lista todos. Los más usados:
+
+| Comando | Qué hace |
+|---|---|
+| `make grpc-server` | Lanza el servicio de inferencia gRPC |
+| `make app` | Lanza la interfaz Streamlit |
+| `make test` | Ejecuta las 169 pruebas |
+| `make coverage` | Pruebas con reporte de cobertura |
+| `make check` | Lint + verificación de formato |
+| `make evaluar` | Evalúa ambos modelos y registra en MLflow |
+| `make compose-up` / `make compose-up-local` | Levanta los dos servicios con Docker Compose |
+| `make proto` | Regenera los stubs gRPC |
+
+---
+
+## Ejecución con Docker
+
+El `Dockerfile` es multi-stage y produce dos imágenes que comparten la etapa de dependencias: `inference`, con TabPFN-v2 en el puerto 50051, y `web`, con Streamlit en el 8501. Las dependencias se instalan en una capa separada del código, corren como usuario sin privilegios y la versión de `uv` está fijada para que dos builds del mismo commit sean idénticos.
+
+El dataset **no se hornea en la imagen**: se monta como volumen en `inference`, igual que en desarrollo local.
+
+```bash
+cp .env.example .env            # y completa TABPFN_TOKEN
+docker compose up --build       # o: make compose-up
+```
+
+`docker-compose.yml` usa `network_mode: host`, pensado para el servidor Linux de despliegue. En Docker Desktop (Windows o macOS) usa la variante con red bridge, que además espera a que `inference` esté sano antes de levantar `web`:
+
+```bash
+docker compose -f docker-compose.local.yml up --build   # o: make compose-up-local
+```
+
+---
+
+## Pruebas y calidad
+
+```bash
+uv run pytest                                               # 169 pruebas
+uv run pytest tests/unit/ -v                                # solo unitarias, sin red ni TabPFN
+uv run pytest --cov=src --cov=app --cov-report=term-missing # con cobertura
+uv run ruff check . && uv run ruff format --check .         # lint y formato
+uv run pre-commit run --all-files                           # todos los hooks
+```
+
+Las pruebas que cargan TabPFN viven en `tests/integration/`, porque necesitan descargar los pesos y bastante RAM. Las unitarias corren sin red, que es lo que ejecuta el pipeline de CI.
+
+### Convenciones verificadas
+
+- **Estructura AAA obligatoria.** Todo test se escribe en tres bloques separados por línea en blanco, encabezados por los comentarios literales `# 1. ARRANGE (...)`, `# 2. ACT (...)` y `# 3. ASSERT (...)` con su descripción. Sin excepciones: los tests que verifican errores capturan la excepción con `as excinfo` y afirman sobre su mensaje en el bloque ASSERT.
+
+  ```python
+  def test_archivo_inexistente_lanza_error(tmp_path):
+      # 1. ARRANGE (Ruta a un archivo que no existe)
+      ruta = tmp_path / "no_existe.csv"
+
+      # 2. ACT (Intentar cargar un archivo que no está en disco)
+      with pytest.raises(FileNotFoundError) as excinfo:
+          load_raw_data(ruta)
+
+      # 3. ASSERT (El mensaje nombra la ruta que falta)
+      assert "no_existe.csv" in str(excinfo.value)
+  ```
+
+- **Docstrings Google obligatorios.** Toda función, método y clase pública documenta `Args:`, `Returns:` y `Raises:`. Lo hace cumplir Ruff (`select = ["D"]`, `convention = "google"`): el build falla si falta una sección.
+- **Pre-commit** ejecuta Ruff en cada commit, más validación de TOML/YAML y limpieza de espacios.
+
+---
+
+## CI/CD y despliegue
+
+El pipeline corre en el [repositorio de GitLab del equipo](https://gitlab.com/dfgarces13/ProyectoDDPIA_MantenimientoPredictivoIA) con un runner propio instalado en un servidor de DigitalOcean. Este repositorio de GitHub conserva el mismo código, pero `.gitlab-ci.yml` solo se ejecuta allá.
+
+| Etapa | Qué hace |
+|---|---|
+| `test` | Ruff (lint y formato) y las pruebas unitarias |
+| `build` | Construye las imágenes `web` e `inference` con Docker Compose |
+| `deploy` | Solo en `master`: descarga el dataset si falta, escribe el token de TabPFN desde una variable protegida y reinicia los contenedores |
+
+El archivo [`.mcp.json`](.mcp.json) configura el [servidor MCP oficial de GitLab](https://docs.gitlab.com/user/model_context_protocol/mcp_server/) para que el equipo pueda revisar issues, merge requests y logs de pipelines desde el editor con cualquier cliente MCP. Usa OAuth, así que no guarda secretos: cada integrante se autentica con su propia cuenta.
+
+---
+
+## Resultados
+
+Clasificación binaria de `Machine failure`. Split estratificado 80/20 con `random_state=42`; métricas medidas sobre los 2.000 registros de prueba (68 fallas reales), siempre sobre la clase falla.
+
+| Modelo | F1 | Recall | PR-AUC |
+|---|:---:|:---:|:---:|
+| **TabPFN-v2** | **0,825** | **0,765** | **0,880** |
+| XGBoost | 0,729 | 0,750 | 0,837 |
+
+**TabPFN-v2 supera al baseline en las tres métricas**, sin entrenamiento por gradiente y sin ajuste de hiperparámetros: solo aprendizaje en contexto. XGBoost compite de cerca en recall (0,750 frente a 0,765) tras compensar el desbalance con `scale_pos_weight = 28,52`.
+
+> **Por qué no se usa accuracy como criterio de éxito.** Con 3,39% de fallas, un modelo que nunca alertara alcanzaría 96,6% de accuracy siendo inútil. El proyecto decide con F1, Recall y PR-AUC de la clase falla. Accuracy se calcula y se registra en MLflow únicamente como dato de contraste que evidencia ese problema.
+
+Cada run queda registrado con el tag `spec_id` de su feature, la licencia y el repositorio del modelo, el hash del dataset, el entorno de ejecución, la latencia de inferencia, predicciones de ejemplo, un reporte de evaluación y el modelo empacado en formato nativo.
+
+---
+
+## Análisis exploratorio (EDA)
+
+Informe completo con tablas y figuras en **[EDA/informe_eda.md](EDA/informe_eda.md)**.
+
+Hallazgos que condicionan el modelado:
+
+- **Desbalance severo:** 339 fallas sobre 10.000 registros (3,39%), lo que descarta *accuracy* y justifica F1, Recall y PR-AUC.
+- **Modos de falla desiguales:** HDF (115), OSF (98) y PWF (95) concentran los casos; TWF (46) y RNF (19) son marginales.
+- **Torque y desgaste son las variables más discriminantes:** en los registros con falla el torque medio sube de 39,6 a 50,2 Nm y el desgaste de 106,7 a 143,8 min, mientras la velocidad baja de 1.540 a 1.496 rpm.
+- **Dos pares casi colineales:** las dos temperaturas (r = 0,88) y velocidad con torque (r = −0,88). TabPFN-v2 lo maneja internamente, sin selección manual de variables.
+- **RNF es ruido por definición:** no debería ser predecible desde las variables de proceso, y conviene tenerlo presente al interpretar el desempeño por modo de falla.
+
+---
+
+## Desarrollo dirigido por especificación
+
+El proyecto se rige por una **constitución** ([`.specify/memory/constitution.md`](.specify/memory/constitution.md), v1.2.2) con seis principios no negociables: TabPFN sin gradiente, métricas de la clase falla, preprocesamiento mínimo y reemplazable, CRISP-DM como marco de fases, estructura AAA en tests y docstrings Google.
+
+Cada incremento se organiza como una feature de spec-kit con su `spec.md` (qué y por qué), `plan.md` (cómo) y `tasks.md` (tareas ordenadas):
+
+| Feature | Alcance | Estado |
+|---|---|:---:|
+| [`001-tabpfn-xgboost-baseline`](specs/001-tabpfn-xgboost-baseline/) | Pipeline TabPFN-v2 + baseline XGBoost + MLflow | ✅ |
+| [`002-eda-preprocesamiento`](specs/002-eda-preprocesamiento/) | Análisis exploratorio del dataset | ✅ |
+| [`003-interfaz-streamlit`](specs/003-interfaz-streamlit/) | Interfaz web y arquitectura MVC | ✅ |
+
+Las desviaciones respecto a lo planeado se documentan en la propia spec en vez de corregirse en silencio. La 002, por ejemplo, incluye una sección de trazabilidad que explica por qué se cerró cubriendo solo el EDA.
+
+### Flujo de trabajo
+
+`main` está protegida y contiene únicamente el commit de estructura inicial; **`develop` es la rama de integración**. El trabajo ocurre en ramas de feature y entra por Pull Request contra `develop`, con mensajes en formato `tipo: descripción breve` (`feat`, `fix`, `chore`, `docs`, `test`, `refactor`).
+
+---
+
+## Estado del proyecto
+
+| Fase | Estado |
+|---|:---:|
+| Estructura del repositorio | ✅ |
+| Carga y exploración del dataset | ✅ |
+| Preprocesamiento y split estratificado | ✅ |
+| Modelo base TabPFN-v2 | ✅ |
+| Baseline XGBoost | ✅ |
+| Evaluación, métricas y tracking MLflow | ✅ |
+| Interfaz Streamlit (MVC) | ✅ |
+| Servicio de inferencia gRPC | ✅ |
+| Contenedorización con Docker Compose | ✅ |
+| Documentación viva de la arquitectura | ✅ |
+| CI/CD y despliegue en GitLab | ✅ |
+
+---
+
+## Equipo
+
+**Universidad Autónoma de Occidente** — Desarrollo de Proyectos en IA
+
+| Integrante |
+|---|
+| Juliana Campuzano |
+| Diego Fernando Garcés |
+| Jorge Iván Gonzáles |
+| Juan José Mosquera |
+
+---
+
+## Licencia
+
+El código de este proyecto se distribuye bajo licencia **MIT** — ver [LICENSE](LICENSE).
+
+Los componentes de terceros conservan sus propios términos: **TabPFN-v2** bajo licencia de Prior Labs (uso no comercial / académico), **XGBoost** bajo Apache-2.0 y el **dataset AI4I 2020** bajo CC BY 4.0.
