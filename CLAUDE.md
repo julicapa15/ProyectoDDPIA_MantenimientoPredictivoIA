@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Predictive maintenance system for industrial machinery (AI4I 2020 dataset) that estimates
 failure probability from operating variables (temperature, rotational speed, torque, tool
 wear). Base model is **TabPFN-v2** (pretrained tabular transformer, in-context learning, no
-gradient training); **XGBoost** is the classical baseline. Served via a **Streamlit** app.
-Academic project for Universidad Autónoma de Occidente, built with spec-kit (spec-driven
-development) across incremental features under `specs/<NNN>-<nombre>/`.
+gradient training); **XGBoost** is the classical baseline. Split into two services that
+talk over **gRPC**: `inference` (loads TabPFN-v2) and `web` (a **Streamlit** UI, a thin
+gRPC client). Academic project for Universidad Autónoma de Occidente, built with spec-kit
+(spec-driven development) across incremental features under `specs/<NNN>-<nombre>/`.
 
 ## Commands
 
@@ -18,7 +19,8 @@ Add dependencies with `uv add` / `uv add --dev` — never `pip install` directly
 
 ```bash
 uv sync                                   # install dependencies
-uv run streamlit run app/main.py          # run the app (or: make app)
+uv run python -m src.serving.server       # run the inference gRPC service (or: make grpc-server)
+uv run streamlit run app/main.py          # run the web UI (or: make app) — needs the above running
 uv run pytest                             # run all tests
 uv run pytest tests/unit/test_xgboost.py  # run a single test file
 uv run pytest tests/unit/test_xgboost.py::test_name -v   # run a single test
@@ -32,10 +34,15 @@ uv run python -m scripts.evaluar_modelos             # evaluate TabPFN + XGBoost
 uv run python -m scripts.evaluar_modelos --sin-tabpfn  # evaluate XGBoost only
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000  # MLflow UI
 uv run python EDA/eda.py                  # regenerate EDA tables/figures
+uv run python -m grpc_tools.protoc -I proto --python_out=proto \
+  --grpc_python_out=proto --pyi_out=proto proto/mantenimiento.proto  # regen gRPC stubs (or: make proto)
+docker compose up --build                 # run both services in containers (or: make compose-up)
+docker compose -f docker-compose.local.yml up --build  # same on Docker Desktop (or: make compose-up-local)
 ```
 
 A `Makefile` wraps most of these (`make help` lists all targets, e.g. `make test`,
-`make lint`, `make app`, `make evaluar`, `make coverage`, `make status`).
+`make lint`, `make app`, `make grpc-server`, `make proto`, `make compose-up`,
+`make evaluar`, `make coverage`, `make status`).
 
 TabPFN-v2 needs a one-time license acceptance at ux.priorlabs.ai; without it, TabPFN
 tests/fixtures skip automatically (`TabPFNLicenseError` is caught in `tests/conftest.py`).
@@ -45,12 +52,23 @@ ux.priorlabs.ai/account and set `$env:TABPFN_TOKEN` before running.
 
 ## Architecture
 
+**Two services talk over gRPC** (contract in `proto/mantenimiento.proto`, stubs generated
+into `proto/*_pb2*.py` by `make proto` — never hand-edited): `inference` (`src/serving/`)
+loads TabPFN-v2 and answers `PredictFailure`/`HealthCheck`; `web` (`app/`) is the Streamlit
+UI, a thin gRPC client with no TabPFN/torch dependency at runtime. The service boundary
+sits exactly where the old in-process call used to be: the client still builds the
+preprocessed `(1, 8)` feature vector itself (`app/utils/preprocessing.preprocess_input`)
+and only sends that vector over the wire — `inference` does not preprocess, only predicts.
+
 **`src/` is the model/data core, framework-agnostic; `app/` is the Streamlit presentation
-layer that consumes it.** Data flows one direction: `src/preprocessing` → `src/models` →
-`src/evaluation`; the Streamlit app re-implements a parallel, simplified preprocessing path
-in `app/utils/` instead of reusing `src/preprocessing` directly (see below). The feature
-*order* is no longer hand-duplicated — `app/utils/preprocessing.NOMBRE_FEATURES` derives
-from `src.preprocessing.preprocess.COLUMNAS_DUMMY + COLUMNAS_NUMERICAS`, and
+layer, `src/serving/` is the gRPC presentation layer for the same core.** Data flows one
+direction: `src/preprocessing` → `src/models` → `src/evaluation`; both `app/` and
+`src/serving/model_loader.py` build a TabPFN context from `src.preprocessing.build_features`
+— `app/` no longer does, now that `src.serving` owns model loading (see below). The
+Streamlit app still re-implements a parallel, simplified preprocessing path in `app/utils/`
+instead of reusing `src/preprocessing` directly. The feature *order* is not hand-duplicated
+— `app/utils/preprocessing.NOMBRE_FEATURES` derives from
+`src.preprocessing.preprocess.COLUMNAS_DUMMY + COLUMNAS_NUMERICAS`, and
 `tests/unit/test_app.py::test_preprocess_input_produce_los_mismos_valores_que_preprocess_features_de_src`
 runs a concrete row through both code paths independently and fails if their 8 output
 values (order or content) ever diverge. The one-hot/dict-building *logic* itself
@@ -83,21 +101,49 @@ pinned to a single source of truth.
   `MLFLOW_TRACKING_URI`.
 - **`scripts/evaluar_modelos.py`**: CLI entrypoint that runs the full pipeline
   (load → build_features → fit both models → compute metrics → log to MLflow) end to end;
-  this is what CI/reproduction commands and the README's results table come from.
+  this is what CI/reproduction commands and the README's results table come from. Offline,
+  unrelated to the gRPC serving path below.
+- **`proto/mantenimiento.proto`** + generated `proto/mantenimiento_pb2.py` /
+  `_pb2_grpc.py`: the gRPC contract between `web` and `inference`. `InferenceService` has
+  two RPCs — `PredictFailure(features: repeated double) -> (proba_no_failure, proba_failure)`
+  and `HealthCheck`. Regenerate with `make proto` after editing the `.proto`; the generated
+  `_pb2_grpc.py` needs its `import mantenimiento_pb2` patched to
+  `from proto import mantenimiento_pb2` (protoc's well-known relative-import gap for
+  packaged stubs) — `make proto` does this patch automatically, don't hand-edit it away.
+  Both generated files are excluded from Ruff (`extend-exclude` in `pyproject.toml`) since
+  they're never hand-edited.
+- **`src/serving/`**: the `inference` service. `model_loader.py` is the
+  Streamlit-free equivalent of the old `app/utils/model.py` — loads the dataset via
+  `src.preprocessing`, fits a 1000-row stratified TabPFN-v2 context once (no
+  `st.cache_resource`, since this process has no Streamlit runtime and only needs to load
+  once at startup). `server.py`'s `InferenceServicer` implements the two RPCs and `serve()`
+  starts the gRPC server (`GRPC_PORT` env var, default 50051). `healthcheck.py` is a tiny
+  gRPC client used as the Docker `HEALTHCHECK` for the `inference` image — it calls the
+  service's own `HealthCheck` RPC rather than just probing the TCP port, so a container
+  where the model failed to load is correctly reported unhealthy.
 - **`app/`**: `main.py` is the Streamlit orchestrator/entrypoint. Because Streamlit executes
   this file directly (not as part of the `app` package), it manually inserts the project
   root into `sys.path` *before* importing `app.*` / `src.*` — this is why `app/**` is
   exempted from Ruff's `E402` (imports-not-at-top) in `pyproject.toml`. `app/utils/model.py`
-  loads data via `src.preprocessing` and caches a TabPFN model fitted on a 1000-row
-  stratified context (`@st.cache_resource`, tuned for 1-2s CPU inference latency) — this is
-  the only place `app/` reuses `src/` for data loading. `app/utils/preprocessing.py`
-  rebuilds the one-hot + feature vector for a single form submission by hand (no pandas
-  dependency, just numpy), but imports `NOMBRE_FEATURES` from
-  `src.preprocessing.preprocess`'s constants instead of hardcoding the column order — see
-  Architecture intro above for the drift test that guards this. `app/utils/physics.py` has
-  pure derived-quantity functions (mechanical power, ΔT) and the alert-level thresholds
-  (0.30 / 0.70) shown in the UI. `app/components/form.py` and `results.py` render the input
-  form and prediction output.
+  is now a gRPC **client**, not a model loader: `get_inference_stub()` opens (and
+  `@st.cache_resource`-caches) a channel to `INFERENCE_SERVICE_ADDR` (env var, default
+  `localhost:50051`; gRPC connects lazily, so caching the stub doesn't require the service
+  to be up yet), `predict_failure(X_new)` calls `PredictFailure` and re-shapes the response
+  back into the `(1, 2)` array `app/components/results.py` expects, and
+  `check_inference_health()` backs the connectivity banner shown on the page. A
+  `grpc.RpcError` from `predict_failure` is translated to a domain exception —
+  `InferenceServiceUnavailableError` for `UNAVAILABLE`/`DEADLINE_EXCEEDED`, its base
+  `InferenceServiceError` for anything else (e.g. the server's `INVALID_ARGUMENT` when the
+  vector isn't 8 finite values) — which `main.py` catches as `InferenceServiceError` to show
+  a friendly `st.error`, instead of leaking gRPC specifics into the presentation layer.
+  `check_inference_health` runs on every Streamlit rerun, so it uses its own short
+  `TIMEOUT_HEALTH_SEGUNDOS`, not the 90 s prediction timeout. `app/utils/preprocessing.py` rebuilds the one-hot
+  + feature vector for a single form submission by hand (no pandas dependency, just numpy),
+  but imports `NOMBRE_FEATURES` from `src.preprocessing.preprocess`'s constants instead of
+  hardcoding the column order — see Architecture intro above for the drift test that guards
+  this. `app/utils/physics.py` has pure derived-quantity functions (mechanical power, ΔT)
+  and the alert-level thresholds (0.30 / 0.70) shown in the UI. `app/components/form.py` and
+  `results.py` render the input form and prediction output.
 
 ## Conventions (enforced, not optional)
 
@@ -122,3 +168,11 @@ pinned to a single source of truth.
   `tipo: descripción breve` (`feat`, `fix`, `chore`, `docs`, `test`, `refactor`).
 - Full rules used for AI-assisted code review live in `AGENTS.md`; the constitution at
   `.specify/memory/constitution.md` is the source of truth if the two ever disagree.
+
+## MCP
+
+`.mcp.json` (repo root — the file Claude Code reads for project-scoped servers;
+`.claude/mcp.json` is *not* read) shares the official GitLab MCP server
+(`https://gitlab.com/api/v4/mcp`, OAuth per user, no secrets in the repo) with the whole
+team. Personal servers with machine-specific paths go in local/user scope
+(`claude mcp add --scope local ...`), never in `.mcp.json`.

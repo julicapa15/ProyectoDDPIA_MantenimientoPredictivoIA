@@ -1,0 +1,32 @@
+# Orquesta los dos servicios que se comunican por gRPC (ver
+# proto/mantenimiento.proto y Dockerfile):
+#   - inference: carga TabPFN-v2 y expone el servicio gRPC en :50051.
+#   - web: interfaz Streamlit, cliente gRPC de `inference`, en :8501.
+#
+# Uso: `docker compose up --build` (o `make compose-up`).
+# Requiere el dataset AI4I 2020 en ./data/raw/ai4i2020.csv (se monta como
+# volumen en `inference`, ver README > "Ejecución con Docker") y, para que
+# TabPFN-v2 cargue, TABPFN_TOKEN en el entorno o en un archivo .env local
+# (ver .env.example).
+
+services:
+  inference:
+    build:
+      context: .
+      target: inference
+    network_mode: host
+    environment:
+      - GRPC_PORT=50051
+      - TABPFN_TOKEN=${TABPFN_TOKEN:-}
+    volumes:
+      - ./data:/app/data
+
+  web:
+    build:
+      context: .
+      target: web
+    network_mode: host
+    environment:
+      - INFERENCE_SERVICE_ADDR=localhost:50051
+    depends_on:
+      - inference

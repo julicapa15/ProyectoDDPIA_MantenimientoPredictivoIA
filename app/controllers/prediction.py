@@ -6,23 +6,28 @@ magnitudes que la vista necesita mostrar.
 
 No importa Streamlit a propósito: al ser coordinación pura, se puede probar sin
 levantar la interfaz, y la Vista queda reducida a dibujar valores ya resueltos.
+La inferencia llega inyectada como función: en la app es el cliente gRPC del
+servicio `inference` (`app.utils.model.predict_failure`), en las pruebas un doble.
 """
 
+from collections.abc import Callable
 from typing import Any
+
+import numpy as np
 
 from app.utils.physics import calculate_delta_t, calculate_power, get_alert_level
 from app.utils.preprocessing import preprocess_input
-from src.models import TabPFNClassifier
 
 
 def ejecutar_prediccion(
-    model: TabPFNClassifier,
+    predecir: Callable[[np.ndarray], np.ndarray],
     inputs: dict[str, float | str],
 ) -> dict[str, Any]:
     """Convierte los datos del formulario en una predicción del modelo.
 
     Args:
-        model: Clasificador TabPFN-v2 con su contexto de referencia ya cargado.
+        predecir: Función que recibe el vector `(1, 8)` y devuelve la matriz
+            `(1, 2)` con `[P(no falla), P(falla)]`.
         inputs: Valores devueltos por `render_machine_form()`, con las claves
             `product_type`, `air_temp`, `process_temp`, `rpm`, `torque` y
             `tool_wear`.
@@ -42,7 +47,7 @@ def ejecutar_prediccion(
         inputs["tool_wear"],
     )
     return {
-        "proba": model.predict_proba_con_contexto(X_new),
+        "proba": predecir(X_new),
         "X_new": X_new,
         "air_temp": inputs["air_temp"],
         "process_temp": inputs["process_temp"],

@@ -5,6 +5,8 @@ Vista del patrón MVC: solo dibuja valores ya resueltos por
 magnitudes propias.
 """
 
+import json
+
 import numpy as np
 import streamlit as st
 
@@ -52,10 +54,12 @@ def render_results(
 
     with st.expander("Detalles de la predicción"):
         st.write("**Vector de entrada (8 features):**")
-        st.code(
-            dict(zip(NOMBRE_FEATURES, X_new[0], strict=True)),
-            language="json",
-        )
+        # `float()` explícito: el repr de np.float64 en numpy 2 es `np.float64(…)`,
+        # que no es JSON y se vería literal en la interfaz.
+        vector = {
+            nombre: float(valor) for nombre, valor in zip(NOMBRE_FEATURES, X_new[0], strict=True)
+        }
+        st.code(json.dumps(vector, indent=2, ensure_ascii=False), language="json")
         st.write(
             f"**Probabilidades completas:** No falla {proba[0, 0]:.4f} · Falla {proba[0, 1]:.4f}"
         )

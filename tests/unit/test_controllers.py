@@ -53,7 +53,7 @@ def test_ejecutar_prediccion_envia_al_modelo_el_vector_de_8_features(entradas):
     modelo = ModeloFalso(prob_falla=0.42)
 
     # 2. ACT (Ejecutar el controlador de predicción)
-    resultado = ejecutar_prediccion(modelo, entradas)
+    resultado = ejecutar_prediccion(modelo.predict_proba_con_contexto, entradas)
 
     # 3. ASSERT (El modelo recibió el vector con la forma del pipeline de entrenamiento)
     assert modelo.recibido.shape == (1, len(NOMBRE_FEATURES))
@@ -65,7 +65,7 @@ def test_ejecutar_prediccion_conserva_las_variables_para_las_metricas_derivadas(
     modelo = ModeloFalso(prob_falla=0.10)
 
     # 2. ACT (Ejecutar el controlador de predicción)
-    resultado = ejecutar_prediccion(modelo, entradas)
+    resultado = ejecutar_prediccion(modelo.predict_proba_con_contexto, entradas)
 
     # 3. ASSERT (Quedan las 4 variables que luego necesita derivar_vista)
     assert resultado["air_temp"] == entradas["air_temp"]
@@ -76,7 +76,9 @@ def test_ejecutar_prediccion_conserva_las_variables_para_las_metricas_derivadas(
 
 def test_derivar_vista_calcula_potencia_y_delta_t(entradas):
     # 1. ARRANGE (Resultado de una predicción previa)
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.10), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=0.10).predict_proba_con_contexto, entradas
+    )
 
     # 2. ACT (Derivar los valores que consume la vista)
     vista = derivar_vista(resultado, UMBRAL_FALLA)
@@ -89,7 +91,9 @@ def test_derivar_vista_calcula_potencia_y_delta_t(entradas):
 def test_derivar_vista_aplica_el_umbral_configurable_sin_reejecutar_la_inferencia(entradas):
     # 1. ARRANGE (Una sola predicción con probabilidad entre ambos umbrales)
     prob = (UMBRAL_PRECAUCION + UMBRAL_FALLA) / 2
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=prob), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=prob).predict_proba_con_contexto, entradas
+    )
 
     # 2. ACT (Derivar la vista dos veces, variando solo el umbral)
     vista_conservadora = derivar_vista(resultado, UMBRAL_FALLA)
@@ -103,7 +107,9 @@ def test_derivar_vista_aplica_el_umbral_configurable_sin_reejecutar_la_inferenci
 
 def test_derivar_vista_entrega_exactamente_las_claves_que_espera_la_vista(entradas):
     # 1. ARRANGE (Resultado de una predicción previa)
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.90), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=0.90).predict_proba_con_contexto, entradas
+    )
 
     # 2. ACT (Derivar los valores que consume la vista)
     vista = derivar_vista(resultado, UMBRAL_FALLA)
@@ -114,7 +120,9 @@ def test_derivar_vista_entrega_exactamente_las_claves_que_espera_la_vista(entrad
 
 def test_un_umbral_por_debajo_de_precaucion_es_rechazado(entradas):
     # 1. ARRANGE (Predicción válida y un umbral que colapsaría la banda intermedia)
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.5), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=0.5).predict_proba_con_contexto, entradas
+    )
     umbral_invalido = UMBRAL_PRECAUCION - 0.01
 
     # 2. ACT (Derivar la vista con ese umbral fuera de rango)
@@ -127,7 +135,10 @@ def test_un_umbral_por_debajo_de_precaucion_es_rechazado(entradas):
 
 def test_las_claves_del_controlador_coinciden_con_los_parametros_de_la_vista(entradas):
     # 1. ARRANGE (Vista derivada y firma real de render_results)
-    vista = derivar_vista(ejecutar_prediccion(ModeloFalso(prob_falla=0.5), entradas), UMBRAL_FALLA)
+    vista = derivar_vista(
+        ejecutar_prediccion(ModeloFalso(prob_falla=0.5).predict_proba_con_contexto, entradas),
+        UMBRAL_FALLA,
+    )
 
     # 2. ACT (Leer los parámetros que declara la vista)
     parametros = set(inspect.signature(render_results).parameters)
@@ -141,7 +152,7 @@ def test_ejecutar_prediccion_probabilidad_en_rango(entradas):
     modelo = ModeloFalso(prob_falla=0.42)
 
     # 2. ACT (Ejecutar la predicción)
-    resultado = ejecutar_prediccion(modelo, entradas)
+    resultado = ejecutar_prediccion(modelo.predict_proba_con_contexto, entradas)
 
     # 3. ASSERT (La probabilidad está en el rango [0, 1])
     prob_falla = float(resultado["proba"][0, 1])
@@ -153,7 +164,7 @@ def test_ejecutar_prediccion_guarda_X_new_numpy(entradas):
     modelo = ModeloFalso(prob_falla=0.15)
 
     # 2. ACT (Ejecutar la predicción)
-    resultado = ejecutar_prediccion(modelo, entradas)
+    resultado = ejecutar_prediccion(modelo.predict_proba_con_contexto, entradas)
 
     # 3. ASSERT (X_new es un array numpy de dtype float)
     assert isinstance(resultado["X_new"], np.ndarray)
@@ -162,7 +173,9 @@ def test_ejecutar_prediccion_guarda_X_new_numpy(entradas):
 
 def test_derivar_vista_delta_t_y_potencia_coherentes(entradas):
     # 1. ARRANGE (Predicción con entradas conocidas)
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.20), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=0.20).predict_proba_con_contexto, entradas
+    )
 
     # 2. ACT (Derivar la vista)
     vista = derivar_vista(resultado, UMBRAL_FALLA)
@@ -174,7 +187,9 @@ def test_derivar_vista_delta_t_y_potencia_coherentes(entradas):
 
 def test_derivar_vista_proba_es_numpy(entradas):
     # 1. ARRANGE (Predicción válida)
-    resultado = ejecutar_prediccion(ModeloFalso(prob_falla=0.50), entradas)
+    resultado = ejecutar_prediccion(
+        ModeloFalso(prob_falla=0.50).predict_proba_con_contexto, entradas
+    )
 
     # 2. ACT (Derivar la vista)
     vista = derivar_vista(resultado, UMBRAL_FALLA)
