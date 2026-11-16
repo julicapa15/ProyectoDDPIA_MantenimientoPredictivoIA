@@ -49,3 +49,17 @@ def xgboost_proba(split_data):
     modelo = XGBoostBaseline.from_class_balance(y_train)
     modelo.fit(X_train, y_train)
     return modelo.predict_proba(X_test)
+
+
+@pytest.fixture(scope="session")
+def inference_servicer(dataset_path):
+    """Servicer gRPC real, con TabPFN-v2 ya cargado. Costosa: una sola vez por sesión."""
+    from tabpfn.errors import TabPFNLicenseError
+
+    from src.serving.server import InferenceServicer
+
+    del dataset_path  # Solo se usa para heredar el skip si falta el dataset.
+    try:
+        return InferenceServicer()
+    except TabPFNLicenseError:
+        pytest.skip("Licencia de TabPFN no aceptada: ver https://ux.priorlabs.ai/account/licenses")

@@ -24,6 +24,14 @@ MLFLOW_PORT := 5000
 # entorno si ya esta exportada; de lo contrario, `make TABPFN_TOKEN=... docker-run`.
 TABPFN_TOKEN ?=
 
+# Servicio gRPC de inferencia (ver proto/mantenimiento.proto). GRPC_PORT debe
+# coincidir con el puerto que escucha src/serving/server.py.
+GRPC_PORT := 50051
+
+# Stage del Dockerfile a construir/ejecutar con docker-build/docker-run: `web`
+# (por defecto) o `inference`. Ej: `make DOCKER_TARGET=inference docker-build`.
+DOCKER_TARGET ?= web
+
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  HELP — Menú de comandos                                                   ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -49,15 +57,20 @@ help: ## Muestra este menú de ayuda
 	@echo    test-app           Tests de la interfaz Streamlit
 	@echo    coverage           Tests con reporte de cobertura
 	@echo.
-	@echo  Aplicacion:
-	@echo    app                Lanza la interfaz web (Streamlit)
-	@echo    app-reload         Lanza con hot-reload forzado
+	@echo  Aplicacion (servicios gRPC, ver proto/mantenimiento.proto):
+	@echo    grpc-server        Lanza el servicio de inferencia TabPFN-v2 (puerto 50051)
+	@echo    app                Lanza la interfaz web (Streamlit, cliente del servicio anterior)
+	@echo    app-reload         Lanza la interfaz con hot-reload forzado
+	@echo    proto              Regenera los stubs gRPC desde proto/mantenimiento.proto
 	@echo    evaluar            Evalua TabPFN + XGBoost (MLflow)
 	@echo    evaluar-xgboost    Evalua solo XGBoost
 	@echo.
 	@echo  Docker:
-	@echo    docker-build       Construye la imagen Docker
-	@echo    docker-run         Ejecuta la app en contenedor
+	@echo    docker-build       Construye un stage suelto (DOCKER_TARGET=web^|inference)
+	@echo    docker-run         Ejecuta ese stage suelto en un contenedor
+	@echo    compose-up         Levanta web + inference juntos con docker compose
+	@echo    compose-up-local   Igual, pero con red bridge (Docker Desktop Windows/macOS)
+	@echo    compose-down       Detiene los servicios de docker compose
 	@echo.
 	@echo  Utilidades:
 	@echo    clean              Limpia caches y archivos temporales
@@ -114,11 +127,20 @@ coverage: ## Ejecuta tests con reporte de cobertura
 	$(PYTEST) --cov=src --cov=app --cov-report=term-missing -v
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  APLICACIÓN — Interfaz web y evaluación de modelos                         ║
+# ║  APLICACIÓN — Servicios gRPC, interfaz web y evaluación de modelos         ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+.PHONY: proto
+proto: ## Regenera los stubs gRPC desde proto/mantenimiento.proto
+	uv run python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto --pyi_out=proto proto/mantenimiento.proto
+	@$(PYTHON) -c "import pathlib; p = pathlib.Path('proto/mantenimiento_pb2_grpc.py'); s = p.read_text(); p.write_text(s.replace('import mantenimiento_pb2 as mantenimiento__pb2', 'from proto import mantenimiento_pb2 as mantenimiento__pb2'))"
+
+.PHONY: grpc-server
+grpc-server: ## Lanza el servicio de inferencia gRPC (TabPFN-v2, puerto 50051)
+	$(PYTHON) -m src.serving.server
+
 .PHONY: app
-app: ## Lanza la interfaz web de Streamlit
+app: ## Lanza la interfaz web de Streamlit (requiere `grpc-server` corriendo aparte)
 	$(STREAMLIT) run $(APP_FILE) --server.port=$(PORT)
 
 .PHONY: app-reload
@@ -138,12 +160,24 @@ evaluar-xgboost: ## Evalúa solo XGBoost (sin TabPFN)
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 .PHONY: docker-build
-docker-build: ## Construye la imagen Docker del proyecto
-	docker build -t mantenimiento-predictivo .
+docker-build: ## Construye un stage suelto del Dockerfile (ver DOCKER_TARGET)
+	docker build --target $(DOCKER_TARGET) -t mantenimiento-predictivo-$(DOCKER_TARGET) .
 
 .PHONY: docker-run
-docker-run: ## Ejecuta la app en un contenedor Docker (monta ./data y reenvia TABPFN_TOKEN)
-	docker run --rm -p $(PORT):8501 -v "$(CURDIR)/data:/app/data" -e TABPFN_TOKEN=$(TABPFN_TOKEN) mantenimiento-predictivo
+docker-run: ## Ejecuta ese stage suelto (monta ./data y reenvia TABPFN_TOKEN; solo compose conecta los dos servicios)
+	docker run --rm -p $(PORT):8501 -p $(GRPC_PORT):$(GRPC_PORT) -v "$(CURDIR)/data:/app/data" -e TABPFN_TOKEN=$(TABPFN_TOKEN) -e GRPC_PORT=$(GRPC_PORT) mantenimiento-predictivo-$(DOCKER_TARGET)
+
+.PHONY: compose-up
+compose-up: ## Levanta web + inference juntos con docker compose (comunicados por gRPC)
+	docker compose up --build
+
+.PHONY: compose-up-local
+compose-up-local: ## Levanta web + inference en Docker Desktop (red bridge, ver docker-compose.local.yml)
+	docker compose -f docker-compose.local.yml up --build
+
+.PHONY: compose-down
+compose-down: ## Detiene y elimina los contenedores de docker compose
+	docker compose down
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  UTILIDADES — Limpieza y mantenimiento                                     ║

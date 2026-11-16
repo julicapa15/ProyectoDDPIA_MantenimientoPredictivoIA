@@ -13,7 +13,11 @@ from app.components.form import render_machine_form
 from app.components.results import render_results
 from app.components.settings import render_alert_sensitivity
 from app.controllers import derivar_vista, ejecutar_prediccion
-from app.utils.model import load_model_and_context
+from app.utils.model import (
+    InferenceServiceError,
+    check_inference_health,
+    predict_failure,
+)
 
 st.set_page_config(
     page_title="Mantenimiento Predictivo",
@@ -26,13 +30,20 @@ st.caption("Clasificación de fallas con TabPFN-v2 · Dataset AI4I 2020")
 
 umbral_falla = render_alert_sensitivity()
 
-model = load_model_and_context()
+if check_inference_health():
+    st.caption("🟢 Servicio de inferencia (gRPC) conectado")
+else:
+    st.caption("🔴 Servicio de inferencia (gRPC) no disponible — la predicción fallará")
 
 inputs = render_machine_form()
 
 if inputs:
     with st.spinner("Ejecutando inferencia con TabPFN-v2..."):
-        st.session_state.resultado = ejecutar_prediccion(model, inputs)
+        try:
+            st.session_state.resultado = ejecutar_prediccion(predict_failure, inputs)
+        except InferenceServiceError as exc:
+            st.error(str(exc))
+            st.stop()
 
 if "resultado" in st.session_state:
     # El umbral se aplica aquí y no al predecir: mover el slider recalcula la

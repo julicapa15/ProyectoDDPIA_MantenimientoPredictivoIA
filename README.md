@@ -9,8 +9,10 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.63-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Docker](https://img.shields.io/badge/Docker-python%3A3.12--slim-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![MLflow](https://img.shields.io/badge/MLflow-3.16-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![gRPC](https://img.shields.io/badge/gRPC-1.84-244C5A?logo=grpc&logoColor=white)](https://grpc.io/)
+[![GitLab CI/CD](https://img.shields.io/badge/CI%2FCD-GitLab-FC6D26?logo=gitlab&logoColor=white)](https://gitlab.com/dfgarces13/ProyectoDDPIA_MantenimientoPredictivoIA/-/pipelines)
 
-[![Tests](https://img.shields.io/badge/tests-146%20passed-3FB950?logo=pytest&logoColor=white)](#pruebas-y-calidad)
+[![Tests](https://img.shields.io/badge/tests-169-3FB950?logo=pytest&logoColor=white)](#pruebas-y-calidad)
 [![Ruff](https://img.shields.io/badge/lint-Ruff-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![Constitución](https://img.shields.io/badge/constituci%C3%B3n-v1.2.2-8957E5)](.specify/memory/constitution.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
@@ -29,6 +31,7 @@
 - [Uso](#uso)
 - [Ejecución con Docker](#ejecución-con-docker)
 - [Pruebas y calidad](#pruebas-y-calidad)
+- [CI/CD y despliegue](#cicd-y-despliegue)
 - [Resultados](#resultados)
 - [Análisis exploratorio](#análisis-exploratorio-eda)
 - [Desarrollo dirigido por especificación](#desarrollo-dirigido-por-especificación)
@@ -56,29 +59,34 @@ El hecho determinante es su **desbalance severo: solo 339 registros (3,39%) corr
 
 El modelo base es **TabPFN-v2**, un transformer preentrenado para datos tabulares que predice *en contexto*: recibe el conjunto de referencia como parte de la llamada y devuelve probabilidades, **sin entrenamiento por gradiente ni búsqueda de hiperparámetros**. Como referencia clásica se contrasta contra un **XGBoost** entrenado desde cero, compensando el desbalance con `scale_pos_weight`.
 
-La solución se expone en una interfaz **Streamlit** organizada según el patrón MVC y se empaqueta con **Docker**.
+La solución se divide en dos servicios que se comunican por **gRPC**: `inference` carga TabPFN-v2 y expone la predicción por la red, y `web` es una interfaz **Streamlit** organizada según el patrón MVC que actúa como cliente ligero de ese servicio. Ambos se empaquetan con **Docker Compose** y se despliegan con un pipeline de **GitLab CI/CD** en un servidor de DigitalOcean.
 
 ---
 
 ## Arquitectura
 
-> 📐 **[Diagrama interactivo →](docs/arquitectura.html)** — explorable, con temas claro/oscuro, vistas guiadas y exportación a PNG/SVG. Descárgalo y ábrelo en el navegador; GitHub no renderiza HTML en línea.
+> 📐 **[Diagrama interactivo →](docs/arquitectura.html)** de la versión monolítica previa a gRPC, explorable y con exportación a PNG/SVG. Descárgalo y ábrelo en el navegador; GitHub no renderiza HTML en línea.
 
 ```mermaid
 flowchart LR
     operador(["Operador<br/>navegador :8501"])
 
-    subgraph app["app/ · Interfaz Streamlit (MVC)"]
+    subgraph web["Servicio web · Streamlit (MVC)"]
         direction LR
         vista["<b>Vista</b><br/>app/components/<br/><i>solo dibuja</i>"]
         ctrl["<b>Controlador</b><br/>app/controllers/<br/><i>sin Streamlit</i>"]
-        dominio["<b>Modelo de la app</b><br/>app/utils/<br/><i>física · features · caché</i>"]
+        cliente["<b>Cliente gRPC</b><br/>app/utils/model.py<br/><i>vector de 8 features</i>"]
+    end
+
+    subgraph inference["Servicio inference · gRPC :50051"]
+        direction LR
+        server["<b>InferenceService</b><br/>src/serving/<br/><i>PredictFailure · HealthCheck</i>"]
+        tabpfn["<b>TabPFN-v2</b><br/><i>contexto de 1.000 muestras</i>"]
     end
 
     subgraph src["src/ · Núcleo agnóstico del framework"]
         direction LR
         preproc["<b>Preprocesamiento</b><br/>carga · one-hot · split 80/20"]
-        tabpfn["<b>TabPFN-v2</b><br/><i>sin gradiente</i>"]
         xgb["<b>XGBoost</b><br/><i>baseline</i>"]
         evalm["<b>Evaluación</b><br/>F1 · Recall · PR-AUC"]
     end
@@ -89,9 +97,10 @@ flowchart LR
 
     operador --> vista
     vista -->|"6 variables"| ctrl
-    ctrl -->|"arma el vector"| dominio
+    ctrl --> cliente
+    cliente ==>|"protobuf · proto/mantenimiento.proto"| server
     ctrl -.->|"alerta · potencia · ΔT"| vista
-    dominio -->|"contexto de 1.000 muestras"| tabpfn
+    server --> tabpfn
     preproc --> tabpfn
     preproc -.-> xgb
     preproc --> dataset
@@ -107,7 +116,9 @@ flowchart LR
 |---|---|---|
 | **Vista** | `app/components/` | Solo dibuja. Recibe valores ya resueltos; no invoca funciones de dominio ni calcula nada. |
 | **Controlador** | `app/controllers/` | Coordina: formulario → vector → inferencia → valores para la vista. No importa Streamlit, y por eso se prueba sin levantar la interfaz. |
-| **Modelo (app)** | `app/utils/` | Dominio de la interfaz: física, umbrales de alerta, construcción del vector y caché del clasificador. |
+| **Modelo (app)** | `app/utils/` | Dominio de la interfaz: física, umbrales de alerta, construcción del vector y cliente gRPC del servicio de inferencia. |
+| **Servicio de inferencia** | `src/serving/` | Carga TabPFN-v2 una sola vez y expone `PredictFailure` y `HealthCheck` por gRPC. Valida la entrada y responde `INVALID_ARGUMENT` ante un vector mal formado. |
+| **Contrato** | `proto/` | Definición protobuf compartida por cliente y servidor, con sus stubs generados (`make proto`). |
 | **Modelo (núcleo)** | `src/` | Carga y validación del dataset, preprocesamiento, modelos y evaluación. No sabe que existe Streamlit. |
 
 ### Decisiones que sostienen el diseño
@@ -115,6 +126,8 @@ flowchart LR
 - **Una sola fuente de verdad para el orden de las features.** `app/utils/preprocessing.NOMBRE_FEATURES` se deriva de `src.preprocessing.preprocess` en vez de repetir la lista. Un test procesa una misma fila por ambos caminos y falla si divergen.
 - **El umbral de alerta se aplica al renderizar, no al predecir.** Mover el slider recalcula el semáforo sobre la misma probabilidad, sin repetir una inferencia que toma 1-2 s en CPU.
 - **El contrato entre capas está testeado.** Un test compara con `inspect.signature` las claves que produce el controlador contra los parámetros que declara la vista.
+- **El modelo pesado vive fuera de la interfaz.** Streamlit no importa torch ni tabpfn: solo abre un canal gRPC. La interfaz arranca en segundos, muestra si el servicio está conectado y, si no lo está, falla con un mensaje explícito en vez de colgarse.
+- **El controlador recibe la inferencia inyectada.** En la app es el cliente gRPC y en las pruebas un doble, por eso la coordinación se prueba sin red ni modelo.
 - **TabPFN no se entrena.** Se usa `fit_context()`, que solo registra el conjunto de referencia. La interfaz fija 1.000 muestras estratificadas para mantener la latencia baja.
 
 ---
@@ -126,12 +139,14 @@ flowchart LR
 ├── app/                      # Interfaz Streamlit (patrón MVC)
 │   ├── components/           #   Vista: formulario, resultados, ajustes
 │   ├── controllers/          #   Controlador: coordinación de la predicción
-│   ├── utils/                #   Modelo de la app: física, preprocesamiento, caché
+│   ├── utils/                #   Modelo de la app: física, preprocesamiento, cliente gRPC
 │   └── main.py               #   Entrypoint de Streamlit
 ├── src/                      # Núcleo agnóstico del framework
 │   ├── preprocessing/        #   Carga, one-hot de Type, split estratificado
 │   ├── models/               #   TabPFN-v2 y baseline XGBoost
+│   ├── serving/              #   Servicio gRPC de inferencia
 │   └── evaluation/           #   Métricas de la clase falla y tracking MLflow
+├── proto/                    # Contrato gRPC (.proto) y stubs generados
 ├── tests/
 │   ├── unit/                 #   Pruebas unitarias
 │   └── integration/          #   Pruebas de extremo a extremo
@@ -141,7 +156,10 @@ flowchart LR
 ├── docs/                     # Diagrama de arquitectura interactivo
 ├── data/raw/                 # Dataset AI4I 2020 (no versionado)
 ├── .specify/memory/          # Constitución del proyecto
-├── Dockerfile                # Imagen de producción (python:3.12-slim + uv)
+├── Dockerfile                # Multi-stage: imágenes `web` e `inference`
+├── docker-compose.yml        # Orquesta los dos servicios en el servidor Linux
+├── docker-compose.local.yml  # Variante para Docker Desktop (red bridge)
+├── .gitlab-ci.yml            # Pipeline test → build → deploy
 ├── Makefile                  # Atajos de desarrollo (`make help`)
 ├── LICENSE                   # MIT, más los términos de terceros
 └── pyproject.toml            # Dependencias y configuración de Ruff/pytest
@@ -159,7 +177,9 @@ flowchart LR
 | Procesamiento | pandas · NumPy · scikit-learn |
 | Visualización | matplotlib |
 | Interfaz | Streamlit |
-| Contenedor | Docker (`python:3.12-slim` + uv 0.12.3) |
+| Comunicación entre servicios | gRPC · Protocol Buffers |
+| Contenedor | Docker multi-stage (`python:3.12-slim` + uv 0.12.3) · Docker Compose |
+| CI/CD | GitLab CI/CD con runner propio en DigitalOcean |
 | Gestión de entorno | uv |
 | Pruebas | pytest · pytest-cov |
 | Calidad | Ruff (lint + formato) · pre-commit |
@@ -220,8 +240,11 @@ setx UV_LINK_MODE copy
 
 ### Interfaz web
 
+La app son dos procesos que se hablan por gRPC. En dos terminales:
+
 ```bash
-uv run streamlit run app/main.py        # o: make app
+uv run python -m src.serving.server     # terminal 1, servicio de inferencia (o: make grpc-server)
+uv run streamlit run app/main.py        # terminal 2, interfaz web (o: make app)
 ```
 
 Disponible en `http://localhost:8501`. Ingresa las seis variables, presiona **Predecir falla** y obtienes:
@@ -262,47 +285,47 @@ Genera cuatro tablas en `EDA/` y cinco figuras en `EDA/figures/`.
 
 | Comando | Qué hace |
 |---|---|
+| `make grpc-server` | Lanza el servicio de inferencia gRPC |
 | `make app` | Lanza la interfaz Streamlit |
-| `make test` | Ejecuta las 146 pruebas |
+| `make test` | Ejecuta las 169 pruebas |
 | `make coverage` | Pruebas con reporte de cobertura |
 | `make check` | Lint + verificación de formato |
 | `make evaluar` | Evalúa ambos modelos y registra en MLflow |
-| `make docker-build` / `make docker-run` | Construye y ejecuta el contenedor |
+| `make compose-up` / `make compose-up-local` | Levanta los dos servicios con Docker Compose |
+| `make proto` | Regenera los stubs gRPC |
 
 ---
 
 ## Ejecución con Docker
 
-La imagen instala las dependencias en una capa separada del código, de modo que un cambio en `app/` o `src/` no obliga a reinstalar TabPFN, XGBoost y PyTorch. Corre como usuario sin privilegios, fija la versión de `uv` para que dos builds del mismo commit sean idénticos, e incluye un `HEALTHCHECK` contra el endpoint de salud de Streamlit.
+El `Dockerfile` es multi-stage y produce dos imágenes que comparten la etapa de dependencias: `inference`, con TabPFN-v2 en el puerto 50051, y `web`, con Streamlit en el 8501. Las dependencias se instalan en una capa separada del código, corren como usuario sin privilegios y la versión de `uv` está fijada para que dos builds del mismo commit sean idénticos.
 
-El dataset **no se hornea en la imagen**: se monta como volumen, igual que en desarrollo local.
+El dataset **no se hornea en la imagen**: se monta como volumen en `inference`, igual que en desarrollo local.
 
 ```bash
-# Construir
-docker build -t mantenimiento-predictivo .
-
-# Ejecutar montando el dataset y pasando la API key de TabPFN
-docker run -p 8501:8501 \
-  -v "$(pwd)/data:/app/data" \
-  -e TABPFN_TOKEN="tu_api_key" \
-  mantenimiento-predictivo
+cp .env.example .env            # y completa TABPFN_TOKEN
+docker compose up --build       # o: make compose-up
 ```
 
-En PowerShell, sustituye `$(pwd)` por `${PWD}`.
+`docker-compose.yml` usa `network_mode: host`, pensado para el servidor Linux de despliegue. En Docker Desktop (Windows o macOS) usa la variante con red bridge, que además espera a que `inference` esté sano antes de levantar `web`:
+
+```bash
+docker compose -f docker-compose.local.yml up --build   # o: make compose-up-local
+```
 
 ---
 
 ## Pruebas y calidad
 
 ```bash
-uv run pytest                                               # 146 pruebas
-uv run pytest tests/unit/ -v                                # solo unitarias
+uv run pytest                                               # 169 pruebas
+uv run pytest tests/unit/ -v                                # solo unitarias, sin red ni TabPFN
 uv run pytest --cov=src --cov=app --cov-report=term-missing # con cobertura
 uv run ruff check . && uv run ruff format --check .         # lint y formato
 uv run pre-commit run --all-files                           # todos los hooks
 ```
 
-Las pruebas que dependen de TabPFN se omiten automáticamente si no hay licencia aceptada, en vez de romper la suite.
+Las pruebas que cargan TabPFN viven en `tests/integration/`, porque necesitan descargar los pesos y bastante RAM. Las unitarias corren sin red, que es lo que ejecuta el pipeline de CI.
 
 ### Convenciones verificadas
 
@@ -323,6 +346,20 @@ Las pruebas que dependen de TabPFN se omiten automáticamente si no hay licencia
 
 - **Docstrings Google obligatorios.** Toda función, método y clase pública documenta `Args:`, `Returns:` y `Raises:`. Lo hace cumplir Ruff (`select = ["D"]`, `convention = "google"`): el build falla si falta una sección.
 - **Pre-commit** ejecuta Ruff en cada commit, más validación de TOML/YAML y limpieza de espacios.
+
+---
+
+## CI/CD y despliegue
+
+El pipeline corre en el [repositorio de GitLab del equipo](https://gitlab.com/dfgarces13/ProyectoDDPIA_MantenimientoPredictivoIA) con un runner propio instalado en un servidor de DigitalOcean. Este repositorio de GitHub conserva el mismo código, pero `.gitlab-ci.yml` solo se ejecuta allá.
+
+| Etapa | Qué hace |
+|---|---|
+| `test` | Ruff (lint y formato) y las pruebas unitarias |
+| `build` | Construye las imágenes `web` e `inference` con Docker Compose |
+| `deploy` | Solo en `master`: descarga el dataset si falta, escribe el token de TabPFN desde una variable protegida y reinicia los contenedores |
+
+El archivo [`.mcp.json`](.mcp.json) configura el [servidor MCP oficial de GitLab](https://docs.gitlab.com/user/model_context_protocol/mcp_server/) para que el equipo pueda revisar issues, merge requests y logs de pipelines desde el editor con cualquier cliente MCP. Usa OAuth, así que no guarda secretos: cada integrante se autentica con su propia cuenta.
 
 ---
 
@@ -388,9 +425,10 @@ Las desviaciones respecto a lo planeado se documentan en la propia spec en vez d
 | Baseline XGBoost | ✅ |
 | Evaluación, métricas y tracking MLflow | ✅ |
 | Interfaz Streamlit (MVC) | ✅ |
-| Contenedorización con Docker | ✅ |
+| Servicio de inferencia gRPC | ✅ |
+| Contenedorización con Docker Compose | ✅ |
 | Documentación viva de la arquitectura | ✅ |
-| Integración continua | ⏳ |
+| CI/CD y despliegue en GitLab | ✅ |
 
 ---
 
